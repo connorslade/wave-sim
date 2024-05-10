@@ -1,0 +1,3 @@
+[workspace]
+resolver = "2"
+members = ["wave_sim_gpu"]

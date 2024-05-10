@@ -1,0 +1,15 @@
+[package]
+name = "wave_sim_gpu"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.83"
+bytemuck = "1.15.0"
+encase = "0.8.0"
+flume = "0.11.0"
+nd_vec = "0.4.0"
+pollster = "0.3.0"
+wgpu = "0.20.0"
