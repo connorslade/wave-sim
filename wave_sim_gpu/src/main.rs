@@ -2,11 +2,15 @@ use std::{sync::Arc, time::Instant};
 
 use anyhow::{Context, Result};
 use egui::Egui;
-use wgpu::{TextureFormat, TextureUsages};
+use wgpu::{
+    CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
+    Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
+    TextureFormat, TextureUsages, TextureViewDescriptor,
+};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
-    event_loop::EventLoop,
+    event_loop::{ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowBuilder},
 };
@@ -17,13 +21,13 @@ mod simulation;
 use renderer::Renderer;
 use simulation::Simulation;
 
-const SIZE: (u32, u32) = (2048, 2048);
+const SIZE: (u32, u32) = (1920, 1080);
 
 struct App<'a> {
     window: Arc<Window>,
-    surface: wgpu::Surface<'a>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    surface: Surface<'a>,
+    device: Device,
+    queue: Queue,
 
     simulation: Simulation,
     renderer: Renderer,
@@ -33,19 +37,19 @@ struct App<'a> {
 }
 
 async fn run() -> Result<()> {
-    let instance = wgpu::Instance::default();
+    let instance = Instance::default();
 
     let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions::default())
+        .request_adapter(&RequestAdapterOptions::default())
         .await
         .context("No adapter found")?;
 
     let (device, queue) = adapter
         .request_device(
-            &wgpu::DeviceDescriptor {
+            &DeviceDescriptor {
                 label: None,
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::downlevel_defaults(),
+                required_features: Features::empty(),
+                required_limits: Limits::default(),
             },
             None,
         )
@@ -69,14 +73,14 @@ async fn run() -> Result<()> {
     let size = window.inner_size();
     surface.configure(
         &device,
-        &wgpu::SurfaceConfiguration {
+        &SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: TextureFormat::Rgba8Unorm,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: PresentMode::Fifo,
             desired_maximum_frame_latency: 2,
-            alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+            alpha_mode: CompositeAlphaMode::Opaque,
             view_formats: vec![],
         },
     );
@@ -96,7 +100,7 @@ async fn run() -> Result<()> {
         last_frame: Instant::now(),
     };
 
-    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    event_loop.set_control_flow(ControlFlow::Poll);
 
     event_loop.run(|event, event_loop| {
         if let Event::WindowEvent {
@@ -137,7 +141,7 @@ impl<'a> App<'a> {
         let context_buffer = self.simulation.get_context_buffer(&self.device);
         let mut encoder = self
             .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         self.simulation
             .update(&self.device, &mut encoder, &context_buffer);
@@ -145,7 +149,7 @@ impl<'a> App<'a> {
         let output = self.surface.get_current_texture().unwrap();
         let view = output
             .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+            .create_view(&TextureViewDescriptor::default());
 
         self.renderer
             .render(self, &mut encoder, &context_buffer, &view);
