@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Instant};
 
 use anyhow::{Context, Result};
 use egui::Egui;
+use image::io::Reader;
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
     Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
@@ -21,8 +22,6 @@ mod simulation;
 use renderer::Renderer;
 use simulation::Simulation;
 
-const SIZE: (u32, u32) = (1920, 1080);
-
 struct App<'a> {
     window: Arc<Window>,
     surface: Surface<'a>,
@@ -37,6 +36,9 @@ struct App<'a> {
 }
 
 async fn run() -> Result<()> {
+    let image = Reader::open("map.png")?.decode()?;
+    let size = (image.width(), image.height());
+
     let instance = Instance::default();
 
     let adapter = instance
@@ -55,15 +57,15 @@ async fn run() -> Result<()> {
         )
         .await?;
 
-    let simulation = Simulation::new(&device, SIZE);
-    let renderer = Renderer::new(&device, SIZE.0 * SIZE.1);
+    let simulation = Simulation::new(&device, image);
+    let renderer = Renderer::new(&device, size.0 * size.1);
 
     let event_loop = EventLoop::new()?;
 
     let window = Arc::new(
         WindowBuilder::new()
             .with_title("Wave Simulator")
-            .with_inner_size(PhysicalSize::new(SIZE.0, SIZE.1))
+            .with_inner_size(PhysicalSize::new(size.0, size.1))
             .with_resizable(false)
             .build(&event_loop)?,
     );
@@ -162,11 +164,20 @@ impl<'a> App<'a> {
             &view,
             |ctx| {
                 ::egui::Window::new("Wave Simulator").show(ctx, |ui| {
-                    ui.label(format!("Size: {}x{}", SIZE.0, SIZE.1));
+                    let size = self.simulation.get_size();
+                    ui.label(format!("Size: {}x{}", size.0, size.1));
                     ui.label(format!("FPS: {:.2}", frame_time.as_secs_f64().recip()));
                     ui.label(format!("Tick: {}", self.simulation.tick));
 
                     ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.1).text("C"));
+                    ui.add(
+                        ::egui::Slider::new(&mut self.simulation.amplitude, 0.0..=0.05)
+                            .text("Amplitude"),
+                    );
+                    ui.add(
+                        ::egui::Slider::new(&mut self.simulation.oscillation, 1.0..=1000.0)
+                            .text("Oscillation"),
+                    );
 
                     if ui
                         .button(if self.simulation.running {
