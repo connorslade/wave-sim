@@ -21,22 +21,23 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let y = global_id.y;
     let i = index(x, y);
 
-    if (x == 0 || x == ctx.width - 1 || y == 0 || y == ctx.height - 1) || (x == ctx.width / 2 - 100 && y < ctx.height / 2) {
-        next_states[i] = 0.0;
-        return;
-    }
+    var muls = array<f32, 5>(30.0, 10.0, 8.0, 5.0, 4.0);
+    var length = 5;
 
+   let mul = f32(x > 0 && x < ctx.width - 1 && y > 0 && y < ctx.height - 1);
     next_states[i] = 2.0 * states[i]
         - last_states[i]
-        + 0.01 * (
+        + 0.02 * (
             states[index(x - 1, y)]
             + states[index(x + 1, y)]
             + states[index(x, y - 1)]
             + states[index(x, y + 1)]
             - 4.0 * states[i]
-        );
+        ) * mul;
 
-    let center = vec2<f32>(f32(ctx.width) / 2.0, f32(ctx.height) / 2.0);
-    let distance = length(center - vec2<f32>(f32(x), f32(y)));
-    next_states[i] += 0.01 * exp(-distance) * cos(f32(ctx.tick) / 30.0);
+    for (var j = 0; j < length; j++) {
+        let center = vec2<f32>(f32(ctx.width) / 2.0 - 800.0 + f32(ctx.tick) / muls[j], 256.0 + (1792.0 / f32(length)) * f32(j));
+        let distance = length(center - vec2<f32>(f32(x), f32(y)));
+        next_states[i] += 0.03 * exp(-distance) * cos(f32(ctx.tick) / 30.0);
+    }
 }

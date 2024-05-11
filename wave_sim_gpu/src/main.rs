@@ -3,10 +3,13 @@ use std::{mem, sync::Arc};
 use anyhow::{Context, Result};
 use bytemuck::{Pod, Zeroable};
 use encase::ShaderType;
-use nd_vec::{vector, Vec2};
 use wgpu::{util::DeviceExt, ColorWrites, ShaderSource, TextureFormat, TextureUsages};
 use winit::{
-    application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::EventLoop,
+    application::ApplicationHandler,
+    dpi::PhysicalSize,
+    event::WindowEvent,
+    event_loop::EventLoop,
+    keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
 
@@ -18,6 +21,7 @@ struct App<'a> {
 
     states: [wgpu::Buffer; 3],
     n: usize,
+    running: bool,
 
     instance: wgpu::Instance,
     device: wgpu::Device,
@@ -92,17 +96,17 @@ async fn run() -> Result<()> {
     });
 
     let size = SIZE.0 * SIZE.1;
-    let mut empty_buffer = vec![0f32; size as usize];
-    let center = Vec2::new([SIZE.0 as f32 / 2.0, SIZE.1 as f32 / 2.0]);
-    for y in 0..SIZE.1 {
-        for x in 0..SIZE.0 {
-            let pos = vector!(x as f32, y as f32);
-            let idx = y * SIZE.0 + x;
+    let empty_buffer = vec![0f32; size as usize];
+    // let center = Vec2::new([SIZE.0 as f32 / 2.0, SIZE.1 as f32 / 2.0]);
+    // for y in 0..SIZE.1 {
+    //     for x in 0..SIZE.0 {
+    //         let pos = vector!(x as f32, y as f32);
+    //         let idx = y * SIZE.0 + x;
 
-            let dist = (center - pos).magnitude();
-            empty_buffer[idx as usize] = 2.0 * (-dist).exp();
-        }
-    }
+    //         let dist = (center - pos).magnitude();
+    //         empty_buffer[idx as usize] = 2.0 * (-dist).exp();
+    //     }
+    // }
 
     let state_buffer_descriptor = wgpu::util::BufferInitDescriptor {
         label: Some("Storage Buffer"),
@@ -226,6 +230,7 @@ async fn run() -> Result<()> {
         window: None,
         surface: None,
         n: 0,
+        running: false,
 
         instance,
         device,
@@ -255,6 +260,7 @@ impl<'a> ApplicationHandler for App<'a> {
                 )
                 .unwrap(),
         );
+
         let surface = self.instance.create_surface(window.clone()).unwrap();
 
         let size = window.inner_size();
@@ -282,117 +288,131 @@ impl<'a> ApplicationHandler for App<'a> {
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        if event == WindowEvent::CloseRequested {
-            event_loop.exit();
-        } else if event == WindowEvent::RedrawRequested {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::RedrawRequested => self.render(),
+            WindowEvent::KeyboardInput {
+                device_id: _,
+                event,
+                is_synthetic: _,
+            } => {
+                self.running ^= event.physical_key == PhysicalKey::Code(KeyCode::Space)
+                    && event.state.is_pressed();
+            }
+            _ => {}
+        }
+    }
+}
+
+impl<'a> App<'a> {
+    fn render(&mut self) {
+        let ctx = ShaderContext {
+            width: SIZE.0,
+            height: SIZE.1,
+            tick: self.n as u32,
+        };
+
+        let context_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: &ctx.to_wgsl_bytes(),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+        if self.running {
             self.n = self.n.wrapping_add(1);
 
-            let ctx = ShaderContext {
-                width: SIZE.0,
-                height: SIZE.1,
-                tick: self.n as u32,
-            };
+            let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: context_buffer.as_entire_binding(),
+                    },
+                    // 1 => next, 2 => last, 3 => last2
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: self.states[self.n % 3].as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: self.states[(self.n + 2) % 3].as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: self.states[(self.n + 1) % 3].as_entire_binding(),
+                    },
+                ],
+            });
 
-            let context_buffer =
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        contents: &ctx.to_wgsl_bytes(),
-                        usage: wgpu::BufferUsages::UNIFORM,
-                    });
-
-            let mut encoder = self
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-            {
-                let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
-                let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: None,
-                    layout: &bind_group_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: context_buffer.as_entire_binding(),
-                        },
-                        // 1 => next, 2 => last, 3 => last2
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: self.states[self.n % 3].as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: self.states[(self.n + 2) % 3].as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 3,
-                            resource: self.states[(self.n + 1) % 3].as_entire_binding(),
-                        },
-                    ],
-                });
-
-                let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                    label: None,
-                    timestamp_writes: None,
-                });
-                cpass.set_pipeline(&self.compute_pipeline);
-                cpass.set_bind_group(0, &bind_group, &[]);
-                cpass.dispatch_workgroups(SIZE.0 / 8, SIZE.1 / 8, 1);
-            }
-
-            let output = self
-                .surface
-                .as_ref()
-                .unwrap()
-                .get_current_texture()
-                .unwrap();
-            let view = output
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-
-            {
-                let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &self.bind_group_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: context_buffer.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: self.states[self.n % 3].as_entire_binding(),
-                        },
-                    ],
-                    label: None,
-                });
-
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
-
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                });
-                render_pass.set_pipeline(&self.render_pipeline);
-                render_pass.set_bind_group(0, &bind_group, &[]);
-                render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
-                render_pass.draw_indexed(0..6, 0, 0..1);
-            }
-
-            self.queue.submit(Some(encoder.finish()));
-            output.present();
-
-            self.window.as_ref().unwrap().request_redraw();
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: None,
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(&self.compute_pipeline);
+            cpass.set_bind_group(0, &bind_group, &[]);
+            cpass.dispatch_workgroups(SIZE.0 / 8, SIZE.1 / 8, 1);
         }
+
+        let output = self
+            .surface
+            .as_ref()
+            .unwrap()
+            .get_current_texture()
+            .unwrap();
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        {
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &self.bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: context_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: self.states[self.n % 3].as_entire_binding(),
+                    },
+                ],
+                label: None,
+            });
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &bind_group, &[]);
+            render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
+            render_pass.draw_indexed(0..6, 0, 0..1);
+        }
+
+        self.queue.submit(Some(encoder.finish()));
+        output.present();
+
+        self.window.as_ref().unwrap().request_redraw();
     }
 }
 
