@@ -1,4 +1,4 @@
-use egui::{Context, ViewportId, Window};
+use egui::{Context, ViewportId};
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use egui_winit::State;
 use wgpu::{CommandEncoder, Device, Queue, RenderPassDescriptor, TextureFormat, TextureView};
@@ -26,6 +26,7 @@ impl Egui {
         window: &winit::window::Window,
         encoder: &mut CommandEncoder,
         view: &TextureView,
+        run_ui: impl FnOnce(&egui::Context),
     ) {
         let input = self.state.take_egui_input(window);
         let context = self.state.egui_ctx();
@@ -36,19 +37,12 @@ impl Egui {
             pixels_per_point: window.scale_factor() as f32,
         };
 
-        let output = context.run(input, |ctx| {
-            Window::new("Wave Simulator").show(ctx, |ui| {
-                ui.heading("it work!");
-                if ui.button("click me").clicked() {
-                    println!("clicked!");
-                }
-            });
-        });
+        let output = context.run(input, run_ui);
 
         let clipped_primitives = context.tessellate(output.shapes, context.pixels_per_point());
 
         for (id, delta) in output.textures_delta.set {
-            self.renderer.update_texture(device, &queue, id, &delta);
+            self.renderer.update_texture(device, queue, id, &delta);
         }
 
         self.state

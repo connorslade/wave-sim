@@ -8,6 +8,7 @@ struct Context {
     width: u32,
     height: u32,
     tick: u32,
+    c: f32
 }
 
 fn index(x: u32, y: u32) -> u32 {
@@ -24,7 +25,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
    let mul = f32(x > 0 && x < ctx.width - 1 && y > 0 && y < ctx.height - 1);
     next_states[i] = 2.0 * states[i]
         - last_states[i]
-        + 0.02 * (
+        + ctx.c * (
             states[index(x - 1, y)]
             + states[index(x + 1, y)]
             + states[index(x, y - 1)]

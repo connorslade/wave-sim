@@ -1,11 +1,22 @@
+use encase::ShaderType;
 use wgpu::{util::DeviceExt, Buffer, CommandEncoder, Device, ShaderSource};
 
 pub struct Simulation {
     compute_pipeline: wgpu::ComputePipeline,
     states: [wgpu::Buffer; 3],
     size: (u32, u32),
+
+    pub c: f32,
     pub tick: usize,
     pub running: bool,
+}
+
+#[derive(ShaderType)]
+pub struct ShaderContext {
+    width: u32,
+    height: u32,
+    tick: u32,
+    c: f32,
 }
 
 impl Simulation {
@@ -38,6 +49,8 @@ impl Simulation {
             compute_pipeline,
             states: [state_buffer_1, state_buffer_2, state_buffer_3],
             size,
+
+            c: 0.02,
             tick: 0,
             running: false,
         }
@@ -91,5 +104,28 @@ impl Simulation {
         cpass.set_pipeline(&self.compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.dispatch_workgroups(self.size.0 / 8, self.size.1 / 8, 1);
+    }
+
+    pub fn get_context_buffer(&self, device: &Device) -> Buffer {
+        let context = ShaderContext {
+            width: self.size.0,
+            height: self.size.1,
+            tick: self.tick as u32,
+            c: self.c,
+        };
+
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Context Buffer"),
+            contents: &context.to_wgsl_bytes(),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        })
+    }
+}
+
+impl ShaderContext {
+    fn to_wgsl_bytes(&self) -> Vec<u8> {
+        let mut buffer = encase::UniformBuffer::new(Vec::new());
+        buffer.write(self).unwrap();
+        buffer.into_inner()
     }
 }

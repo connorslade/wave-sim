@@ -5,7 +5,7 @@ use wgpu::{
     util::DeviceExt, Buffer, ColorWrites, CommandEncoder, Device, TextureFormat, TextureView,
 };
 
-use crate::{App, ShaderContext};
+use crate::{simulation::ShaderContext, App};
 
 pub struct Renderer {
     render_pipeline: wgpu::RenderPipeline,

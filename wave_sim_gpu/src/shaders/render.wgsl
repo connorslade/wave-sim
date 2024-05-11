@@ -5,6 +5,7 @@ struct Context {
     width: u32,
     height: u32,
     tick: u32,
+    c: f32
 }
 
 // VERTEX SHADER //

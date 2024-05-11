@@ -1,9 +1,8 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use anyhow::{Context, Result};
 use egui::Egui;
-use encase::ShaderType;
-use wgpu::{util::DeviceExt, TextureFormat, TextureUsages};
+use wgpu::{TextureFormat, TextureUsages};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -29,21 +28,8 @@ struct App<'a> {
     simulation: Simulation,
     renderer: Renderer,
     egui: Egui,
-}
 
-#[derive(ShaderType)]
-struct ShaderContext {
-    width: u32,
-    height: u32,
-    tick: u32,
-}
-
-impl ShaderContext {
-    fn to_wgsl_bytes(&self) -> Vec<u8> {
-        let mut buffer = encase::UniformBuffer::new(Vec::new());
-        buffer.write(self).unwrap();
-        buffer.into_inner()
-    }
+    last_frame: Instant,
 }
 
 async fn run() -> Result<()> {
@@ -72,6 +58,7 @@ async fn run() -> Result<()> {
 
     let window = Arc::new(
         WindowBuilder::new()
+            .with_title("Wave Simulator")
             .with_inner_size(PhysicalSize::new(SIZE.0, SIZE.1))
             .with_resizable(false)
             .build(&event_loop)?,
@@ -94,7 +81,7 @@ async fn run() -> Result<()> {
         },
     );
 
-    let egui = Egui::new(&device, &*window);
+    let egui = Egui::new(&device, &window);
 
     let mut app = App {
         window,
@@ -105,6 +92,8 @@ async fn run() -> Result<()> {
         simulation,
         renderer,
         egui,
+
+        last_frame: Instant::now(),
     };
 
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
@@ -130,7 +119,6 @@ async fn run() -> Result<()> {
                     app.simulation.running ^= event.physical_key
                         == PhysicalKey::Code(KeyCode::Space)
                         && event.state.is_pressed();
-                    app.update_title();
                 }
                 _ => {}
             }
@@ -141,19 +129,12 @@ async fn run() -> Result<()> {
 }
 
 impl<'a> App<'a> {
-    fn update_title(&mut self) {
-        self.window.as_ref().set_title(&format!(
-            "Wave Simulator | {}",
-            if self.simulation.running {
-                "running"
-            } else {
-                "paused"
-            }
-        ));
-    }
-
     fn render(&mut self) {
-        let context_buffer = self.get_context_buffer();
+        let now = Instant::now();
+        let frame_time = now - self.last_frame;
+        self.last_frame = now;
+
+        let context_buffer = self.simulation.get_context_buffer(&self.device);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -169,28 +150,38 @@ impl<'a> App<'a> {
         self.renderer
             .render(self, &mut encoder, &context_buffer, &view);
 
-        self.egui
-            .render(&self.device, &self.queue, &self.window, &mut encoder, &view);
+        self.egui.render(
+            &self.device,
+            &self.queue,
+            &self.window,
+            &mut encoder,
+            &view,
+            |ctx| {
+                ::egui::Window::new("Wave Simulator").show(ctx, |ui| {
+                    ui.label(format!("Size: {}x{}", SIZE.0, SIZE.1));
+                    ui.label(format!("FPS: {:.2}", frame_time.as_secs_f64().recip()));
+                    ui.label(format!("Tick: {}", self.simulation.tick));
+
+                    ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.1).text("C"));
+
+                    if ui
+                        .button(if self.simulation.running {
+                            "⏸"
+                        } else {
+                            "▶"
+                        })
+                        .clicked()
+                    {
+                        self.simulation.running ^= true;
+                    }
+                });
+            },
+        );
 
         self.queue.submit([encoder.finish()]);
 
         output.present();
         self.window.request_redraw();
-    }
-
-    fn get_context_buffer(&self) -> wgpu::Buffer {
-        let ctx = ShaderContext {
-            width: SIZE.0,
-            height: SIZE.1,
-            tick: self.simulation.tick as u32,
-        };
-
-        self.device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: &ctx.to_wgsl_bytes(),
-                usage: wgpu::BufferUsages::UNIFORM,
-            })
     }
 }
 
