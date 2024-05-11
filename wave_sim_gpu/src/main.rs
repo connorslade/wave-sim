@@ -6,14 +6,11 @@ use encase::ShaderType;
 use nd_vec::{vector, Vec2};
 use wgpu::{util::DeviceExt, ColorWrites, ShaderSource, TextureFormat, TextureUsages};
 use winit::{
-    application::ApplicationHandler,
-    dpi::PhysicalSize,
-    event::WindowEvent,
-    event_loop::EventLoop,
-    window::{Window, WindowAttributes},
+    application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::EventLoop,
+    window::Window,
 };
 
-const SIZE: (u32, u32) = (1920, 1080);
+const SIZE: (u32, u32) = (2048, 2048);
 
 struct App<'a> {
     window: Option<Arc<Window>>,
@@ -252,7 +249,9 @@ impl<'a> ApplicationHandler for App<'a> {
         let window = Arc::new(
             event_loop
                 .create_window(
-                    Window::default_attributes().with_inner_size(PhysicalSize::new(SIZE.0, SIZE.1)),
+                    Window::default_attributes()
+                        .with_inner_size(PhysicalSize::new(SIZE.0, SIZE.1))
+                        .with_title("Wave Simulator"),
                 )
                 .unwrap(),
         );

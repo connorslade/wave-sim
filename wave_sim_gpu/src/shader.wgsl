@@ -38,5 +38,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let center = vec2<f32>(f32(ctx.width) / 2.0, f32(ctx.height) / 2.0);
     let distance = length(center - vec2<f32>(f32(x), f32(y)));
-    next_states[i] += 0.002 * exp(-distance) * cos(f32(ctx.tick) / 30.0);
+    next_states[i] += 0.01 * exp(-distance) * cos(f32(ctx.tick) / 30.0);
 }
