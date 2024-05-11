@@ -14,5 +14,6 @@ image = "0.25.1"
 nd_vec = "0.4.0"
 pollster = "0.3.0"
 soon = { git = "https://github.com/connorslade/misc" }
+spin_sleep_util = "0.1.1"
 wgpu = "0.19.4"
 winit = "0.29.15"

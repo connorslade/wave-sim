@@ -2061,6 +2061,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin_sleep"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "368a978649eaf70006b082e79c832bd72556ac1393eaf564d686e919dca2347f"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "spin_sleep_util"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f0a8402dff6fc447faddc8bebac9bc3645e5addde1d2293cfd2919d1a8e7efd"
+dependencies = [
+ "spin_sleep",
+]
+
+[[package]]
 name = "spirv"
 version = "0.3.0+sdk-1.3.268.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2447,6 +2465,7 @@ dependencies = [
  "nd_vec",
  "pollster",
  "soon",
+ "spin_sleep_util",
  "wgpu",
  "winit",
 ]

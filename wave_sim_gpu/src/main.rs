@@ -1,8 +1,12 @@
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result};
 use egui::Egui;
 use image::io::Reader;
+use spin_sleep_util::Interval;
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
     Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
@@ -32,6 +36,8 @@ struct App<'a> {
     renderer: Renderer,
     egui: Egui,
 
+    target_fps: u32,
+    interval: Interval,
     last_frame: Instant,
 }
 
@@ -80,7 +86,7 @@ async fn run() -> Result<()> {
             format: TextureFormat::Rgba8Unorm,
             width: size.width,
             height: size.height,
-            present_mode: PresentMode::Fifo,
+            present_mode: PresentMode::Immediate,
             desired_maximum_frame_latency: 2,
             alpha_mode: CompositeAlphaMode::Opaque,
             view_formats: vec![],
@@ -99,6 +105,8 @@ async fn run() -> Result<()> {
         renderer,
         egui,
 
+        target_fps: 60,
+        interval: spin_sleep_util::interval(Duration::from_secs_f64(1.0 / 60.0)),
         last_frame: Instant::now(),
     };
 
@@ -165,10 +173,13 @@ impl<'a> App<'a> {
             |ctx| {
                 ::egui::Window::new("Wave Simulator").show(ctx, |ui| {
                     let size = self.simulation.get_size();
+                    let fps = frame_time.as_secs_f64().recip();
+
                     ui.label(format!("Size: {}x{}", size.0, size.1));
-                    ui.label(format!("FPS: {:.2}", frame_time.as_secs_f64().recip()));
+                    ui.label(format!("FPS: {fps:.2}"));
                     ui.label(format!("Tick: {}", self.simulation.tick));
 
+                    ui.add(::egui::Slider::new(&mut self.target_fps, 30..=1000).text("Target FPS"));
                     ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.1).text("C"));
                     ui.add(
                         ::egui::Slider::new(&mut self.simulation.amplitude, 0.0..=0.05)
@@ -189,6 +200,9 @@ impl<'a> App<'a> {
                     {
                         self.simulation.running ^= true;
                     }
+
+                    self.interval
+                        .set_period(Duration::from_secs_f64(1.0 / self.target_fps as f64));
                 });
             },
         );
@@ -197,6 +211,7 @@ impl<'a> App<'a> {
 
         output.present();
         self.window.request_redraw();
+        self.interval.tick();
     }
 }
 

@@ -72,10 +72,11 @@ impl Simulation {
             size,
 
             tick: 0,
-            c: 0.02,
-            amplitude: 0.01,
-            oscillation: 30.0,
             running: false,
+
+            c: 0.02,
+            amplitude: 0.005,
+            oscillation: 30.0,
         }
     }
 
