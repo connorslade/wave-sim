@@ -35,15 +35,9 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     let x: u32 = u32(in.position.x);
     let y: u32 = u32(in.position.y);
 
-    var val = states[y * ctx.width + x];
-    var color = vec3<f32>(0.0, 0.0, 0.0);
-    
-    if val > 0.0 {
-        color = vec3<f32>(0.0, 0.0, 1.0);
-    } else {
-        color = vec3<f32>(1.0, 0.0, 0.0);
-    }
+    let val = states[y * ctx.width + x];
+    let color = vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0) + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0);
 
-    val = abs(val);
-    return vec4<f32>(color * val + (1 - val), 1.0);
+    let aval = abs(val);
+    return vec4<f32>(color * aval + (1 - aval), 1.0);
 }

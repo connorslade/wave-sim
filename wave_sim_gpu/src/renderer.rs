@@ -106,7 +106,6 @@ impl Renderer {
                 module: &render_shader,
                 entry_point: "vert",
                 buffers: &vertex_buffers,
-                compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &render_shader,
@@ -116,7 +115,6 @@ impl Renderer {
                     blend: None,
                     write_mask: ColorWrites::all(),
                 })],
-                compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 cull_mode: Some(wgpu::Face::Back),
@@ -159,7 +157,6 @@ impl Renderer {
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
-
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,

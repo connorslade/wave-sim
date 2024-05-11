@@ -32,7 +32,6 @@ impl Simulation {
             layout: None,
             module: &compute_shader,
             entry_point: "main",
-            compilation_options: Default::default(),
         });
 
         Self {
