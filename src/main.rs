@@ -188,39 +188,53 @@ impl<'a> App<'a> {
             &mut encoder,
             &view,
             |ctx| {
-                ::egui::Window::new("Wave Simulator").show(ctx, |ui| {
-                    let size = self.simulation.get_size();
-                    let fps = frame_time.as_secs_f64().recip();
+                ::egui::Window::new("Wave Simulator")
+                    .default_width(0.0)
+                    .show(ctx, |ui| {
+                        let size = self.simulation.get_size();
+                        let fps = frame_time.as_secs_f64().recip();
 
-                    ui.label(format!("Size: {}x{}", size.0, size.1));
-                    ui.label(format!("FPS: {fps:.2}"));
-                    ui.label(format!("Tick: {}", self.simulation.tick));
+                        ui.label(format!("Size: {}x{}", size.0, size.1));
+                        ui.label(format!("FPS: {fps:.2}"));
+                        ui.label(format!("Tick: {}", self.simulation.tick));
 
-                    ui.add(::egui::Slider::new(&mut self.target_fps, 30..=1000).text("Target FPS"));
-                    ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.1).text("C"));
-                    ui.add(
-                        ::egui::Slider::new(&mut self.simulation.amplitude, 0.0..=0.05)
-                            .text("Amplitude"),
-                    );
-                    ui.add(
-                        ::egui::Slider::new(&mut self.simulation.oscillation, 1.0..=1000.0)
-                            .text("Oscillation"),
-                    );
+                        ui.separator();
 
-                    if ui
-                        .button(if self.simulation.running {
-                            "⏸"
-                        } else {
-                            "▶"
-                        })
-                        .clicked()
-                    {
-                        self.simulation.running ^= true;
-                    }
+                        ui.add(
+                            ::egui::Slider::new(&mut self.target_fps, 30..=1000).text("Target FPS"),
+                        );
+                        ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.1).text("C"));
+                        ui.add(
+                            ::egui::Slider::new(&mut self.simulation.amplitude, 0.0..=0.05)
+                                .text("Amplitude"),
+                        );
+                        ui.add(
+                            ::egui::Slider::new(&mut self.simulation.oscillation, 1.0..=1000.0)
+                                .text("Oscillation"),
+                        );
 
-                    self.interval
-                        .set_period(Duration::from_secs_f64(1.0 / self.target_fps as f64));
-                });
+                        ui.separator();
+
+                        ui.horizontal(|ui| {
+                            if ui
+                                .button(if self.simulation.running {
+                                    "⏸"
+                                } else {
+                                    "▶"
+                                })
+                                .clicked()
+                            {
+                                self.simulation.running ^= true;
+                            }
+
+                            if ui.button("⟳").clicked() {
+                                self.simulation.reset_states(&self.queue);
+                            }
+                        });
+
+                        self.interval
+                            .set_period(Duration::from_secs_f64(1.0 / self.target_fps as f64));
+                    });
             },
         );
 

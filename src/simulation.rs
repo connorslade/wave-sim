@@ -2,8 +2,9 @@ use encase::ShaderType;
 use image::DynamicImage;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, Buffer, BufferUsages, CommandEncoder,
-    ComputePassDescriptor, ComputePipelineDescriptor, Device, ShaderModuleDescriptor, ShaderSource,
+    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferUsages, CommandEncoder,
+    ComputePassDescriptor, ComputePipelineDescriptor, Device, Queue, ShaderModuleDescriptor,
+    ShaderSource,
 };
 use winit::dpi::PhysicalSize;
 
@@ -55,7 +56,7 @@ impl Simulation {
         let state_buffer_descriptor = BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&empty_buffer),
-            usage: BufferUsages::STORAGE,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         };
         let state_buffer_1 = device.create_buffer_init(&state_buffer_descriptor.clone());
         let state_buffer_2 = device.create_buffer_init(&state_buffer_descriptor.clone());
@@ -132,13 +133,13 @@ impl Simulation {
             ],
         });
 
-        let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor {
+        let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
             label: None,
             timestamp_writes: None,
         });
-        cpass.set_pipeline(&self.compute_pipeline);
-        cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups(self.size.0 / 8, self.size.1 / 8, 1);
+        compute_pass.set_pipeline(&self.compute_pipeline);
+        compute_pass.set_bind_group(0, &bind_group, &[]);
+        compute_pass.dispatch_workgroups(self.size.0 / 8, self.size.1 / 8, 1);
     }
 
     pub fn get_context_buffer(&self, device: &Device, window_size: PhysicalSize<u32>) -> Buffer {
@@ -159,6 +160,18 @@ impl Simulation {
             contents: &context.to_wgsl_bytes(),
             usage: BufferUsages::UNIFORM,
         })
+    }
+
+    pub fn reset_states(&mut self, queue: &Queue) {
+        self.tick = 0;
+        let empty_buffer = vec![0f32; (self.size.0 * self.size.1) as usize];
+        for buffer in &self.states {
+            queue.write_buffer(
+                buffer,
+                BufferAddress::default(),
+                bytemuck::cast_slice(&empty_buffer),
+            )
+        }
     }
 }
 
