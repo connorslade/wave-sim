@@ -1,7 +1,7 @@
 size = [1920, 1080]
 
-shader = "shader.wgsl"
+map = "map.png"
 
 c = 0.02
-amplitude = 0.015
+amplitude = 0.005
 oscillation = 30.0

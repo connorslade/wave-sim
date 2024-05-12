@@ -45,7 +45,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(1.0, 1.0, 1.0, 1.0);
     }
 
-    let val = 1.0 - exp(-states[u32(y) * ctx.width + u32(x)]);
+    let val = states[u32(y) * ctx.width + u32(x)];
     let color = (
           vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0)
         + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0)
