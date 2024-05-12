@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
         .await?;
 
     let simulation = Simulation::new(&device, image);
-    let renderer = Renderer::new(&device, size.0 * size.1);
+    let renderer = Renderer::new(&device, size);
 
     let event_loop = EventLoop::new()?;
 
@@ -181,6 +181,7 @@ impl<'a> App<'a> {
         self.renderer
             .render(self, &mut encoder, &context_buffer, &view);
 
+        let mut do_screenshot = false;
         self.egui.render(
             &self.device,
             &self.queue,
@@ -230,6 +231,10 @@ impl<'a> App<'a> {
                             if ui.button("⟳").clicked() {
                                 self.simulation.reset_states(&self.queue);
                             }
+
+                            if ui.button("📷").clicked() {
+                                do_screenshot = true;
+                            }
                         });
 
                         self.interval
@@ -242,6 +247,13 @@ impl<'a> App<'a> {
 
         output.present();
         self.window.request_redraw();
+
+        if do_screenshot {
+            if let Err(e) = self.renderer.screenshot(self) {
+                eprintln!("Failed to take screenshot: {:?}", e);
+            }
+        }
+
         self.interval.tick();
     }
 }

@@ -1,17 +1,30 @@
-use std::mem;
+use std::{env, fs, mem, path::Path};
 
+use anyhow::Result;
 use bytemuck::{Pod, Zeroable};
+use image::{ImageBuffer, Rgba};
 use wgpu::{
-    util::DeviceExt, Buffer, ColorWrites, CommandEncoder, Device, TextureFormat, TextureView,
+    util::{BufferInitDescriptor, DeviceExt},
+    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferSize,
+    BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, CommandEncoderDescriptor, Device,
+    Extent3d, Face, FragmentState, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, IndexFormat,
+    LoadOp, Maintain, MapMode, MultisampleState, Operations, Origin3d, PipelineLayoutDescriptor,
+    PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp,
+    TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
+    TextureViewDescriptor, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
+    VertexStepMode,
 };
+use winit::dpi::PhysicalSize;
 
 use crate::{simulation::ShaderContext, App};
 
 pub struct Renderer {
-    render_pipeline: wgpu::RenderPipeline,
-    bind_group_layout: wgpu::BindGroupLayout,
-    vertex_buf: wgpu::Buffer,
-    index_buf: wgpu::Buffer,
+    render_pipeline: RenderPipeline,
+    bind_group_layout: BindGroupLayout,
+    vertex_buf: Buffer,
+    index_buf: Buffer,
 }
 
 #[derive(Copy, Clone)]
@@ -21,7 +34,9 @@ struct Vertex {
 }
 
 impl Renderer {
-    pub fn new(device: &Device, size: u32) -> Self {
+    pub fn new(device: &Device, size: (u32, u32)) -> Self {
+        let pixels = size.0 * size.1;
+
         let vertex_size = mem::size_of::<Vertex>();
         let vertex_data = [
             Vertex::new([-1.0, -1.0, 1.0, 1.0], [0.0, 0.0]),
@@ -32,97 +47,95 @@ impl Renderer {
 
         let index_data: &[u16] = &[0, 1, 2, 2, 3, 0];
 
-        let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let vertex_buf = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&vertex_data),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: BufferUsages::VERTEX,
         });
-        let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let index_buf = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(index_data),
-            usage: wgpu::BufferUsages::INDEX,
+            usage: BufferUsages::INDEX,
         });
 
-        let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        let render_shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/render.wgsl").into()),
+            source: ShaderSource::Wgsl(include_str!("shaders/render.wgsl").into()),
         });
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
-                wgpu::BindGroupLayoutEntry {
+                BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new(
-                            mem::size_of::<ShaderContext>() as _
-                        ),
+                        min_binding_size: BufferSize::new(mem::size_of::<ShaderContext>() as _),
                     },
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry {
+                BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new(size as u64 * 4),
+                        min_binding_size: BufferSize::new(pixels as u64 * 4),
                     },
                     count: None,
                 },
             ],
         });
 
-        let vertex_buffers = [wgpu::VertexBufferLayout {
-            array_stride: vertex_size as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
+        let vertex_buffers = [VertexBufferLayout {
+            array_stride: vertex_size as BufferAddress,
+            step_mode: VertexStepMode::Vertex,
             attributes: &[
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x4,
+                VertexAttribute {
+                    format: VertexFormat::Float32x4,
                     offset: 0,
                     shader_location: 0,
                 },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x2,
+                VertexAttribute {
+                    format: VertexFormat::Float32x2,
                     offset: 4 * 4,
                     shader_location: 1,
                 },
             ],
         }];
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
+            vertex: VertexState {
                 module: &render_shader,
                 entry_point: "vert",
                 buffers: &vertex_buffers,
             },
-            fragment: Some(wgpu::FragmentState {
+            fragment: Some(FragmentState {
                 module: &render_shader,
                 entry_point: "frag",
-                targets: &[Some(wgpu::ColorTargetState {
+                targets: &[Some(ColorTargetState {
                     format: TextureFormat::Rgba8Unorm,
                     blend: None,
                     write_mask: ColorWrites::all(),
                 })],
             }),
-            primitive: wgpu::PrimitiveState {
-                cull_mode: Some(wgpu::Face::Back),
+            primitive: PrimitiveState {
+                cull_mode: Some(Face::Back),
                 ..Default::default()
             },
             depth_stencil: None,
             multiview: None,
-            multisample: wgpu::MultisampleState::default(),
+            multisample: MultisampleState::default(),
         });
 
         Self {
@@ -140,14 +153,14 @@ impl Renderer {
         context_buffer: &Buffer,
         view: &TextureView,
     ) {
-        let bind_group = app.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = app.device.create_bind_group(&BindGroupDescriptor {
             layout: &self.bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry {
+                BindGroupEntry {
                     binding: 0,
                     resource: context_buffer.as_entire_binding(),
                 },
-                wgpu::BindGroupEntry {
+                BindGroupEntry {
                     binding: 1,
                     resource: app.simulation.get_state().as_entire_binding(),
                 },
@@ -155,14 +168,14 @@ impl Renderer {
             label: None,
         });
 
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: None,
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            color_attachments: &[Some(RenderPassColorAttachment {
                 view,
                 resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
+                ops: Operations {
+                    load: LoadOp::Load,
+                    store: StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
@@ -171,10 +184,104 @@ impl Renderer {
         });
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &bind_group, &[]);
-        render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.set_index_buffer(self.index_buf.slice(..), IndexFormat::Uint16);
         render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
         render_pass.draw_indexed(0..6, 0, 0..1);
     }
+
+    pub fn screenshot(&self, app: &App) -> Result<()> {
+        let size = app.simulation.get_size();
+        let context_buffer = app
+            .simulation
+            .get_context_buffer(&app.device, PhysicalSize::new(size.0, size.1));
+
+        let texture = app.device.create_texture(&TextureDescriptor {
+            label: None,
+            size: Extent3d {
+                width: size.0,
+                height: size.1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+
+        let screenshot_buffer = app.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: (size.0 * size.1) as u64 * 4,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = app
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor { label: None });
+
+        let view = texture.create_view(&TextureViewDescriptor::default());
+        self.render(app, &mut encoder, &context_buffer, &view);
+
+        encoder.copy_texture_to_buffer(
+            ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: TextureAspect::All,
+            },
+            ImageCopyBuffer {
+                buffer: &screenshot_buffer,
+                layout: ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(4 * size.0 as u32),
+                    rows_per_image: None,
+                },
+            },
+            Extent3d {
+                width: size.0,
+                height: size.1,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        app.queue.submit([encoder.finish()]);
+
+        let screenshot_slice = screenshot_buffer.slice(..);
+        let (tx, rx) = crossbeam_channel::bounded(1);
+        screenshot_slice.map_async(MapMode::Read, move |_| tx.send(()).unwrap());
+
+        app.device.poll(Maintain::Wait);
+        rx.recv().unwrap();
+
+        let data = screenshot_slice.get_mapped_range();
+        let result = bytemuck::cast_slice::<_, u8>(&data).to_vec();
+
+        drop(data);
+        screenshot_buffer.unmap();
+
+        let image = ImageBuffer::<Rgba<u8>, _>::from_vec(size.0, size.1, result).unwrap();
+        save_screenshot(image)
+    }
+}
+
+fn save_screenshot(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<()> {
+    let parent = Path::new("screenshots");
+
+    if !parent.exists() {
+        fs::create_dir(parent)?;
+    }
+
+    for i in 0.. {
+        let path = parent.join(format!("screenshot-{}.png", i));
+        if !path.exists() {
+            image.save(path)?;
+            break;
+        }
+    }
+
+    Ok(())
 }
 
 impl Vertex {
