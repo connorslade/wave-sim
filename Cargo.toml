@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.83"
 bytemuck = "1.15.0"
+clap = { version = "4.5.4", features = ["derive"] }
 crossbeam-channel = "0.5.12"
 egui = "0.27.2"
 egui-wgpu = "0.27.2"
@@ -13,7 +14,9 @@ egui-winit = "0.27.2"
 encase = "0.8.0"
 image = "0.25.1"
 pollster = { version = "0.3.0", features = ["macro"] }
+serde = { version = "1.0.201", features = ["derive"] }
 soon = { git = "https://github.com/connorslade/misc" }
 spin_sleep_util = "0.1.1"
+toml = "0.8.12"
 wgpu = "0.19.4"
 winit = "0.29.15"

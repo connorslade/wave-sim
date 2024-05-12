@@ -1,4 +1,4 @@
-use std::{env, fs, mem, path::Path};
+use std::{fs, mem, path::Path};
 
 use anyhow::Result;
 use bytemuck::{Pod, Zeroable};
@@ -235,7 +235,7 @@ impl Renderer {
                 buffer: &screenshot_buffer,
                 layout: ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(4 * size.0 as u32),
+                    bytes_per_row: Some(4 * size.0),
                     rows_per_image: None,
                 },
             },

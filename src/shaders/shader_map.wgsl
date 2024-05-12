@@ -39,16 +39,23 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = global_id.x;
     let y = global_id.y;
     let i = index(x, y);
-    
+    let map_value = get_map(x, y);
+
+    let wall = f32(map_value.r == 0);
+    let distance = f32(map_value.g) / 255.0;
+    let c = ctx.c * (f32(map_value.b) / 255.0 * 2.0);
+
     next_states[i] = 2.0 * states[i]
        - last_states[i]
-       + ctx.c * (
+       + c * (
            states[index(x - 1, y)]
            + states[index(x + 1, y)]
            + states[index(x, y - 1)]
            + states[index(x, y + 1)]
            - 4.0 * states[i]
-       );
+       ) * wall;
+
+    next_states[i] += ctx.amplitude * distance * cos(f32(ctx.tick) / ctx.oscillation);
 
     tick(x, y);
 }

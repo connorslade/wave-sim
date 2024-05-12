@@ -1,5 +1,8 @@
+use std::{borrow::Cow, fs};
+
+use anyhow::{Context, Result};
 use encase::ShaderType;
-use image::DynamicImage;
+use image::{io::Reader, DynamicImage, GenericImage};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferUsages, CommandEncoder,
@@ -8,10 +11,12 @@ use wgpu::{
 };
 use winit::dpi::PhysicalSize;
 
+use crate::args::Args;
+
 pub struct Simulation {
     compute_pipeline: wgpu::ComputePipeline,
     states: [Buffer; 3],
-    map_buffer: Buffer,
+    map_buffer: Option<Buffer>,
     size: (u32, u32),
 
     pub tick: usize,
@@ -36,23 +41,52 @@ pub struct ShaderContext {
 }
 
 impl Simulation {
-    pub fn new(device: &Device, image: DynamicImage) -> Self {
-        let size = (image.width(), image.height());
+    pub fn new(device: &Device, args: &Args) -> Result<Self> {
+        let map = args
+            .map
+            .as_ref()
+            .map(|map| {
+                let mut image = DynamicImage::new_rgba8(args.size.0, args.size.1);
+                let map = Reader::open(args.base_path().join(map))?.decode()?;
+                let x = (args.size.0 - map.width()) / 2;
+                let y = (args.size.1 - map.height()) / 2;
+                image
+                    .copy_from(&map, x, y)
+                    .context("Map must have a size equal or smaller than the simulation size.")?;
+                Ok::<_, anyhow::Error>(image)
+            })
+            .transpose()?;
+
+        let mut raw_shader = if args.map.is_some() {
+            Cow::Borrowed(include_str!("shaders/shader_map.wgsl"))
+        } else {
+            Cow::Borrowed(include_str!("shaders/shader.wgsl"))
+        };
+        if let Some(ref shader) = args.shader {
+            let shader = fs::read_to_string(args.base_path().join(shader)).unwrap();
+            let line_end = raw_shader.find('\n').unwrap();
+            raw_shader = Cow::Owned(format!(
+                "fn tick(x: u32, y: u32) {{\n{shader}\n}}{}",
+                &raw_shader[line_end..]
+            ));
+        }
 
         let compute_shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
-            source: ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into()),
+            source: ShaderSource::Wgsl(raw_shader),
         });
 
-        let image_data = image.into_rgba8().into_raw();
-        let map_buffer_descriptor = BufferInitDescriptor {
-            label: None,
-            contents: image_data.as_slice(),
-            usage: BufferUsages::STORAGE,
-        };
-        let map_buffer = device.create_buffer_init(&map_buffer_descriptor);
+        let map_buffer = map.map(|map| {
+            let image_data = map.into_rgba8().into_raw();
+            let map_buffer_descriptor = BufferInitDescriptor {
+                label: None,
+                contents: image_data.as_slice(),
+                usage: BufferUsages::STORAGE,
+            };
+            device.create_buffer_init(&map_buffer_descriptor)
+        });
 
-        let empty_buffer = vec![0f32; (size.0 * size.1) as usize];
+        let empty_buffer = vec![0f32; (args.size.0 * args.size.1) as usize];
         let state_buffer_descriptor = BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&empty_buffer),
@@ -69,19 +103,19 @@ impl Simulation {
             entry_point: "main",
         });
 
-        Self {
+        Ok(Self {
             compute_pipeline,
             states: [state_buffer_1, state_buffer_2, state_buffer_3],
             map_buffer,
-            size,
+            size: args.size,
 
             tick: 0,
             running: false,
 
-            c: 0.02,
-            amplitude: 0.005,
-            oscillation: 30.0,
-        }
+            c: args.c,
+            amplitude: args.amplitude,
+            oscillation: args.oscillation,
+        })
     }
 
     pub fn get_state(&self) -> &wgpu::Buffer {
@@ -105,32 +139,35 @@ impl Simulation {
         self.tick = self.tick.wrapping_add(1);
 
         let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
+        let mut entries = vec![
+            BindGroupEntry {
+                binding: 0,
+                resource: context_buffer.as_entire_binding(),
+            },
+            // 2 => next, 3 => last, 4 => last2
+            BindGroupEntry {
+                binding: 2,
+                resource: self.states[self.tick % 3].as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 3,
+                resource: self.states[(self.tick + 2) % 3].as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 4,
+                resource: self.states[(self.tick + 1) % 3].as_entire_binding(),
+            },
+        ];
+        if let Some(ref map) = self.map_buffer {
+            entries.push(BindGroupEntry {
+                binding: 1,
+                resource: map.as_entire_binding(),
+            });
+        }
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: context_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: self.map_buffer.as_entire_binding(),
-                },
-                // 2 => next, 3 => last, 4 => last2
-                BindGroupEntry {
-                    binding: 2,
-                    resource: self.states[self.tick % 3].as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: self.states[(self.tick + 2) % 3].as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 4,
-                    resource: self.states[(self.tick + 1) % 3].as_entire_binding(),
-                },
-            ],
+            entries: &entries,
         });
 
         let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {

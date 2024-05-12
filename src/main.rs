@@ -5,7 +5,6 @@ use std::{
 
 use anyhow::{Context, Result};
 use egui::Egui;
-use image::io::Reader;
 use spin_sleep_util::Interval;
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
@@ -20,6 +19,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+mod args;
 mod egui;
 mod renderer;
 mod simulation;
@@ -43,8 +43,7 @@ struct App<'a> {
 
 #[pollster::main]
 async fn main() -> Result<()> {
-    let image = Reader::open("map.png")?.decode()?;
-    let size = (image.width(), image.height());
+    let args = args::parse()?;
 
     let instance = Instance::default();
 
@@ -64,15 +63,15 @@ async fn main() -> Result<()> {
         )
         .await?;
 
-    let simulation = Simulation::new(&device, image);
-    let renderer = Renderer::new(&device, size);
+    let simulation = Simulation::new(&device, &args)?;
+    let renderer = Renderer::new(&device, args.size);
 
     let event_loop = EventLoop::new()?;
 
     let window = Arc::new(
         WindowBuilder::new()
             .with_title("Wave Simulator")
-            .with_inner_size(PhysicalSize::new(size.0, size.1))
+            .with_inner_size(PhysicalSize::new(args.size.0, args.size.1))
             .build(&event_loop)?,
     );
 
