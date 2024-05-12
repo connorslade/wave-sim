@@ -4,8 +4,8 @@
 struct Context {
     width: u32,
     height: u32,
-    tick: u32,
-    c: f32
+    window_width: u32,
+    window_height: u32,
 }
 
 // VERTEX SHADER //
@@ -33,11 +33,23 @@ fn vert(
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    let x: u32 = u32(in.position.x);
-    let y: u32 = u32(in.position.y);
+    let x_offset = ctx.window_width / 2 - ctx.width / 2;
+    let y_offset = ctx.window_height / 2 - ctx.height / 2;
+    let x = i32(in.position.x) - i32(x_offset);
+    let y = i32(in.position.y) - i32(y_offset);
 
-    let val = states[y * ctx.width + x];
-    let color = vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0) + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0);
+
+    if x == -1 || y == -1 || x == i32(ctx.width) || y == i32(ctx.height) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    } else if x < 0 || x > i32(ctx.width) || y < 0 || y > i32(ctx.height) {
+        return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+    }
+
+    let val = states[u32(y) * ctx.width + u32(x)];
+    let color = (
+          vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0)
+        + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0)
+    );
 
     let aval = abs(val);
     return vec4<f32>(color * aval + (1 - aval), 1.0);

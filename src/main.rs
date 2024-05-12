@@ -41,7 +41,8 @@ struct App<'a> {
     last_frame: Instant,
 }
 
-async fn run() -> Result<()> {
+#[pollster::main]
+async fn main() -> Result<()> {
     let image = Reader::open("map.png")?.decode()?;
     let size = (image.width(), image.height());
 
@@ -72,7 +73,6 @@ async fn run() -> Result<()> {
         WindowBuilder::new()
             .with_title("Wave Simulator")
             .with_inner_size(PhysicalSize::new(size.0, size.1))
-            .with_resizable(false)
             .build(&event_loop)?,
     );
 
@@ -125,6 +125,21 @@ async fn run() -> Result<()> {
             match event {
                 WindowEvent::CloseRequested => event_loop.exit(),
                 WindowEvent::RedrawRequested => app.render(),
+                WindowEvent::Resized(size) => {
+                    app.surface.configure(
+                        &app.device,
+                        &SurfaceConfiguration {
+                            usage: TextureUsages::RENDER_ATTACHMENT,
+                            format: TextureFormat::Rgba8Unorm,
+                            width: size.width,
+                            height: size.height,
+                            present_mode: PresentMode::Immediate,
+                            desired_maximum_frame_latency: 2,
+                            alpha_mode: CompositeAlphaMode::Opaque,
+                            view_formats: vec![],
+                        },
+                    );
+                }
                 WindowEvent::KeyboardInput {
                     device_id: _,
                     event,
@@ -148,7 +163,9 @@ impl<'a> App<'a> {
         let frame_time = now - self.last_frame;
         self.last_frame = now;
 
-        let context_buffer = self.simulation.get_context_buffer(&self.device);
+        let context_buffer = self
+            .simulation
+            .get_context_buffer(&self.device, self.window.inner_size());
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
@@ -213,8 +230,4 @@ impl<'a> App<'a> {
         self.window.request_redraw();
         self.interval.tick();
     }
-}
-
-pub fn main() -> Result<()> {
-    pollster::block_on(run())
 }

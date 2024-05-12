@@ -1,5 +1,5 @@
 [package]
-name = "wave_sim_gpu"
+name = "wave_sim"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,8 +11,7 @@ egui-wgpu = "0.27.2"
 egui-winit = "0.27.2"
 encase = "0.8.0"
 image = "0.25.1"
-nd_vec = "0.4.0"
-pollster = "0.3.0"
+pollster = { version = "0.3.0", features = ["macro"] }
 soon = { git = "https://github.com/connorslade/misc" }
 spin_sleep_util = "0.1.1"
 wgpu = "0.19.4"

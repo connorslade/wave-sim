@@ -8,6 +8,8 @@
 struct Context {
     width: u32,
     height: u32,
+    window_width: u32,
+    window_height: u32,
     tick: u32,
 
     c: f32,

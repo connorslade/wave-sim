@@ -5,6 +5,7 @@ use wgpu::{
     BindGroupDescriptor, BindGroupEntry, Buffer, BufferUsages, CommandEncoder,
     ComputePassDescriptor, ComputePipelineDescriptor, Device, ShaderModuleDescriptor, ShaderSource,
 };
+use winit::dpi::PhysicalSize;
 
 pub struct Simulation {
     compute_pipeline: wgpu::ComputePipeline,
@@ -24,6 +25,8 @@ pub struct Simulation {
 pub struct ShaderContext {
     width: u32,
     height: u32,
+    window_width: u32,
+    window_height: u32,
     tick: u32,
 
     c: f32,
@@ -138,10 +141,12 @@ impl Simulation {
         cpass.dispatch_workgroups(self.size.0 / 8, self.size.1 / 8, 1);
     }
 
-    pub fn get_context_buffer(&self, device: &Device) -> Buffer {
+    pub fn get_context_buffer(&self, device: &Device, window_size: PhysicalSize<u32>) -> Buffer {
         let context = ShaderContext {
             width: self.size.0,
             height: self.size.1,
+            window_width: window_size.width,
+            window_height: window_size.height,
             tick: self.tick as u32,
 
             c: self.c,

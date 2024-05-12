@@ -1306,15 +1306,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nd_vec"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "feb6d97b3da527dc7426d665f8e5e285d07783f8e4c624c8478ce4d63abd8d62"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "ndk"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1637,6 +1628,20 @@ name = "pollster"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22686f4785f02a4fcc856d3b3bb19bf6c8160d103f7a99cc258bddd0251dc7f2"
+dependencies = [
+ "pollster-macro",
+]
+
+[[package]]
+name = "pollster-macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea78f0ef4193055a4b09814ce6bcb572ad1174d6023e2f00a9ea1a798d18d301"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "ppv-lite86"
@@ -2452,7 +2457,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af190c94f2773fdb3729c55b007a722abb5384da03bc0986df4c289bf5567e96"
 
 [[package]]
-name = "wave_sim_gpu"
+name = "wave_sim"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2462,7 +2467,6 @@ dependencies = [
  "egui-winit",
  "encase",
  "image",
- "nd_vec",
  "pollster",
  "soon",
  "spin_sleep_util",

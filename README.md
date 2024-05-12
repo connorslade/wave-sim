@@ -1,4 +1,4 @@
-# wave-sim
+# wave-sim [![Build](https://github.com/connorslade/wave-sim/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/connorslade/wave-sim/actions/workflows/build.yml)
 
 A GPU accelerated simulator for the discretized wave equation.
 
