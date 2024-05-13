@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
         &device,
         &SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
-            format: TextureFormat::Rgba8Unorm,
+            format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
             present_mode: PresentMode::Immediate,
@@ -129,7 +129,7 @@ async fn main() -> Result<()> {
                         &app.device,
                         &SurfaceConfiguration {
                             usage: TextureUsages::RENDER_ATTACHMENT,
-                            format: TextureFormat::Rgba8Unorm,
+                            format: TextureFormat::Bgra8Unorm,
                             width: size.width,
                             height: size.height,
                             present_mode: PresentMode::Immediate,

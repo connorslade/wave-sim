@@ -124,7 +124,7 @@ impl Renderer {
                 module: &render_shader,
                 entry_point: "frag",
                 targets: &[Some(ColorTargetState {
-                    format: TextureFormat::Rgba8Unorm,
+                    format: TextureFormat::Bgra8Unorm,
                     blend: None,
                     write_mask: ColorWrites::all(),
                 })],
@@ -205,7 +205,7 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8Unorm,
+            format: TextureFormat::Bgra8Unorm,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
             view_formats: &[],
         });
@@ -266,7 +266,15 @@ impl Renderer {
     }
 }
 
-fn save_screenshot(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<()> {
+fn save_screenshot(mut image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<()> {
+    // Convert Bgra to Rgba
+    for y in 0..image.height() {
+        for x in 0..image.width() {
+            let bgra = image.get_pixel(x, y).0;
+            image.put_pixel(x, y, Rgba([bgra[2], bgra[1], bgra[0], bgra[3]]));
+        }
+    }
+
     let parent = Path::new("screenshots");
 
     if !parent.exists() {

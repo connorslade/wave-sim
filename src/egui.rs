@@ -14,7 +14,7 @@ impl Egui {
         let context = Context::default();
 
         let state = State::new(context, ViewportId::ROOT, window, None, None);
-        let renderer = Renderer::new(device, TextureFormat::Rgba8Unorm, None, 1);
+        let renderer = Renderer::new(device, TextureFormat::Bgra8Unorm, None, 1);
 
         Self { state, renderer }
     }
