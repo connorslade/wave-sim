@@ -203,7 +203,7 @@ impl<'a> App<'a> {
                         ui.add(
                             ::egui::Slider::new(&mut self.target_fps, 30..=1000).text("Target FPS"),
                         );
-                        ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.1).text("C"));
+                        ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.7).text("C"));
                         ui.add(
                             ::egui::Slider::new(&mut self.simulation.amplitude, 0.0..=0.05)
                                 .text("Amplitude"),

@@ -2,6 +2,6 @@ size = [1920, 1080]
 
 map = "map.png"
 
-c = 0.02
+c = 0.15
 amplitude = 0.005
 oscillation = 30.0

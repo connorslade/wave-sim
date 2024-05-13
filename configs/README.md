@@ -18,9 +18,9 @@ This example uses a shader, even though a map would be fine, to make it resizabl
 
 ![Screenshot](https://github.com/connorslade/wave-sim/assets/50306817/f421710d-edd4-4902-9e0b-4d0fb09fe341)
 
-### Circular Lense
+### Lense
 
 This example uses a map file to define the lense shape.
-It would probably be cooler if it was shaped like an actual lense, but circles are easier to draw.
+Its just two intersecting circles, so it would be easy enough to write as a shader but whatever.
 
-![Screenshot](https://github.com/connorslade/wave-sim/assets/50306817/76bf3622-e3d2-48c1-a593-3fde3d572e51)
+![Screenshot](https://github.com/connorslade/wave-sim/assets/50306817/f73ceaad-68ad-44a5-bf2f-69ce76462c30)

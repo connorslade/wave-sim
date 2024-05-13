@@ -43,17 +43,31 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let wall = f32(map_value.r == 0);
     let distance = f32(map_value.g) / 255.0;
-    let c = ctx.c * (f32(map_value.b) / 255.0 * 2.0);
+    let c = pow(ctx.c * (f32(map_value.b) / 255.0 * 2.0), 2.0);
 
-    next_states[i] = 2.0 * states[i]
-       - last_states[i]
-       + c * (
-           states[index(x - 1, y)]
-           + states[index(x + 1, y)]
-           + states[index(x, y - 1)]
-           + states[index(x, y + 1)]
-           - 4.0 * states[i]
-       ) * wall;
+    if x == 0 {
+        let dx = (states[index(x + 1, y)] - states[i]) * ctx.c;
+        next_states[i] = states[i] + dx;
+    } else if x == ctx.width - 1 {
+        let dx = (states[i] - states[index(x - 1, y)]) * ctx.c;
+        next_states[i] = states[i] - dx;
+    } else if y == 0 {
+        let dy = (states[index(x, y + 1)] - states[i]) * ctx.c;
+        next_states[i] = states[i] + dy;
+    } else if y == ctx.height - 1 {
+        let dy = (states[i] - states[index(x, y - 1)]) * ctx.c;
+        next_states[i] = states[i] - dy;
+    } else {
+        next_states[i] = 2.0 * states[i]
+            - last_states[i]
+            + c * (
+                states[index(x - 1, y)]
+                + states[index(x + 1, y)]
+                + states[index(x, y - 1)]
+                + states[index(x, y + 1)]
+                - 4.0 * states[i]
+            ) * wall;
+    }
 
     next_states[i] += ctx.amplitude * distance * cos(f32(ctx.tick) / ctx.oscillation);
 
