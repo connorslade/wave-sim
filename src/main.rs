@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use egui::Egui;
+use image::ImageFormat;
 use spin_sleep_util::Interval;
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
@@ -16,7 +17,7 @@ use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
-    window::{Window, WindowBuilder},
+    window::{Icon, Window, WindowBuilder},
 };
 
 mod args;
@@ -25,6 +26,8 @@ mod renderer;
 mod simulation;
 use renderer::Renderer;
 use simulation::Simulation;
+
+const ICON: &[u8] = include_bytes!("assets/icon.png");
 
 struct App<'a> {
     window: Arc<Window>,
@@ -68,9 +71,13 @@ async fn main() -> Result<()> {
 
     let event_loop = EventLoop::new()?;
 
+    let icon = image::load_from_memory_with_format(ICON, ImageFormat::Png).unwrap();
     let window = Arc::new(
         WindowBuilder::new()
-            .with_title("Wave Simulator")
+            .with_title("Wave Simulator | Connor Slade")
+            .with_window_icon(Some(
+                Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
+            ))
             .with_inner_size(PhysicalSize::new(args.size.0, args.size.1))
             .build(&event_loop)?,
     );
