@@ -2,6 +2,9 @@ size = [2048, 2048]
 
 shader = "shader.wgsl"
 
-c = 0.15
-amplitude = 0.025
-oscillation = 25.0
+dt = 0.011
+dx = 0.05
+
+v = 340.29
+amplitude = 0.02
+frequency = 4.0

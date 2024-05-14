@@ -9,4 +9,4 @@ let emitter = vec2<f32>(
     f32(ctx.height) / 2.0 + 500.0 * sin(f32(ctx.tick) / 300.0)
 );
 let distance = distance(emitter, vec2<f32>(f32(x), f32(y)));
-next_states[i] += 2.0 * ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) / ctx.oscillation);
+next_states[i] += 2.0 * ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
