@@ -31,11 +31,7 @@ use simulation::Simulation;
 const ICON: &[u8] = include_bytes!("assets/icon.png");
 
 struct App<'a> {
-    window: Arc<Window>,
-    surface: Surface<'a>,
-    device: Device,
-    queue: Queue,
-
+    graphics: GraphicsContext<'a>,
     simulation: Simulation,
     renderer: Renderer,
     egui: Egui,
@@ -43,6 +39,13 @@ struct App<'a> {
     target_fps: u32,
     interval: Interval,
     last_frame: Instant,
+}
+
+struct GraphicsContext<'a> {
+    window: Arc<Window>,
+    surface: Surface<'a>,
+    device: Device,
+    queue: Queue,
 }
 
 #[pollster::main]
@@ -103,10 +106,12 @@ async fn main() -> Result<()> {
     let egui = Egui::new(&device, &window);
 
     let mut app = App {
-        window,
-        surface,
-        device,
-        queue,
+        graphics: GraphicsContext {
+            window,
+            surface,
+            device,
+            queue,
+        },
 
         simulation,
         renderer,
@@ -126,15 +131,15 @@ async fn main() -> Result<()> {
         } = event
         {
             if !matches!(event, WindowEvent::RedrawRequested) {
-                app.egui.handle_event(&app.window, &event);
+                app.egui.handle_event(&app.graphics, &event);
             }
 
             match event {
                 WindowEvent::CloseRequested => event_loop.exit(),
                 WindowEvent::RedrawRequested => app.render(),
                 WindowEvent::Resized(size) => {
-                    app.surface.configure(
-                        &app.device,
+                    app.graphics.surface.configure(
+                        &app.graphics.device,
                         &SurfaceConfiguration {
                             usage: TextureUsages::RENDER_ATTACHMENT,
                             format: TextureFormat::Bgra8Unorm,
@@ -166,17 +171,18 @@ async fn main() -> Result<()> {
 
 impl<'a> App<'a> {
     fn render(&mut self) {
+        let gc = &self.graphics;
         let context_buffer = self
             .simulation
-            .get_context_buffer(&self.device, self.window.inner_size());
-        let mut encoder = self
+            .get_context_buffer(&gc.device, gc.window.inner_size());
+        let mut encoder = gc
             .device
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         self.simulation
-            .update(&self.device, &mut encoder, &context_buffer);
+            .update(&gc.device, &mut encoder, &context_buffer);
 
-        let output = self.surface.get_current_texture().unwrap();
+        let output = gc.surface.get_current_texture().unwrap();
         let view = output
             .texture
             .create_view(&TextureViewDescriptor::default());
@@ -185,29 +191,22 @@ impl<'a> App<'a> {
             .render(self, &mut encoder, &context_buffer, &view);
 
         let mut do_screenshot = false;
-        self.egui.render(
-            &self.device,
-            &self.queue,
-            &self.window,
-            &mut encoder,
-            &view,
-            |ctx| {
-                ui::ui(
-                    ctx,
-                    &self.queue,
-                    &mut self.simulation,
-                    &mut self.interval,
-                    &mut self.last_frame,
-                    &mut self.target_fps,
-                    &mut do_screenshot,
-                );
-            },
-        );
+        self.egui.render(gc, &mut encoder, &view, |ctx| {
+            ui::ui(
+                ctx,
+                &gc.queue,
+                &mut self.simulation,
+                &mut self.interval,
+                &mut self.last_frame,
+                &mut self.target_fps,
+                &mut do_screenshot,
+            );
+        });
 
-        self.queue.submit([encoder.finish()]);
+        gc.queue.submit([encoder.finish()]);
 
         output.present();
-        self.window.request_redraw();
+        gc.window.request_redraw();
 
         if do_screenshot {
             if let Err(e) = self.renderer.screenshot(self) {

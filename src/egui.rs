@@ -1,8 +1,10 @@
 use egui::{Context, ViewportId};
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use egui_winit::State;
-use wgpu::{CommandEncoder, Device, Queue, RenderPassDescriptor, TextureFormat, TextureView};
+use wgpu::{CommandEncoder, Device, RenderPassDescriptor, TextureFormat, TextureView};
 use winit::event::WindowEvent;
+
+use crate::GraphicsContext;
 
 pub struct Egui {
     state: State,
@@ -21,20 +23,18 @@ impl Egui {
 
     pub fn render(
         &mut self,
-        device: &Device,
-        queue: &Queue,
-        window: &winit::window::Window,
+        gc: &GraphicsContext,
         encoder: &mut CommandEncoder,
         view: &TextureView,
         run_ui: impl FnOnce(&egui::Context),
     ) {
-        let input = self.state.take_egui_input(window);
+        let input = self.state.take_egui_input(&gc.window);
         let context = self.state.egui_ctx();
 
-        let window_size = window.inner_size();
+        let window_size = gc.window.inner_size();
         let screen = ScreenDescriptor {
             size_in_pixels: [window_size.width, window_size.height],
-            pixels_per_point: window.scale_factor() as f32,
+            pixels_per_point: gc.window.scale_factor() as f32,
         };
 
         let output = context.run(input, run_ui);
@@ -42,14 +42,15 @@ impl Egui {
         let clipped_primitives = context.tessellate(output.shapes, context.pixels_per_point());
 
         for (id, delta) in output.textures_delta.set {
-            self.renderer.update_texture(device, queue, id, &delta);
+            self.renderer
+                .update_texture(&gc.device, &gc.queue, id, &delta);
         }
 
         self.state
-            .handle_platform_output(window, output.platform_output);
+            .handle_platform_output(&gc.window, output.platform_output);
 
         self.renderer
-            .update_buffers(device, queue, encoder, &clipped_primitives, &screen);
+            .update_buffers(&gc.device, &gc.queue, encoder, &clipped_primitives, &screen);
 
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: None,
@@ -74,7 +75,7 @@ impl Egui {
         // }
     }
 
-    pub fn handle_event(&mut self, window: &winit::window::Window, event: &WindowEvent) {
-        let _ = self.state.on_window_event(window, event);
+    pub fn handle_event(&mut self, gc: &GraphicsContext, event: &WindowEvent) {
+        let _ = self.state.on_window_event(&gc.window, event);
     }
 }

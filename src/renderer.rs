@@ -153,7 +153,8 @@ impl Renderer {
         context_buffer: &Buffer,
         view: &TextureView,
     ) {
-        let bind_group = app.device.create_bind_group(&BindGroupDescriptor {
+        let gc = &app.graphics;
+        let bind_group = gc.device.create_bind_group(&BindGroupDescriptor {
             layout: &self.bind_group_layout,
             entries: &[
                 BindGroupEntry {
@@ -190,12 +191,13 @@ impl Renderer {
     }
 
     pub fn screenshot(&self, app: &App) -> Result<()> {
+        let gc = &app.graphics;
         let size = app.simulation.get_size();
         let context_buffer = app
             .simulation
-            .get_context_buffer(&app.device, PhysicalSize::new(size.0, size.1));
+            .get_context_buffer(&gc.device, PhysicalSize::new(size.0, size.1));
 
-        let texture = app.device.create_texture(&TextureDescriptor {
+        let texture = gc.device.create_texture(&TextureDescriptor {
             label: None,
             size: Extent3d {
                 width: size.0,
@@ -210,14 +212,14 @@ impl Renderer {
             view_formats: &[],
         });
 
-        let screenshot_buffer = app.device.create_buffer(&wgpu::BufferDescriptor {
+        let screenshot_buffer = gc.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size: (size.0 * size.1) as u64 * 4,
             usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
 
-        let mut encoder = app
+        let mut encoder = gc
             .device
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
@@ -246,13 +248,13 @@ impl Renderer {
             },
         );
 
-        app.queue.submit([encoder.finish()]);
+        gc.queue.submit([encoder.finish()]);
 
         let screenshot_slice = screenshot_buffer.slice(..);
         let (tx, rx) = crossbeam_channel::bounded(1);
         screenshot_slice.map_async(MapMode::Read, move |_| tx.send(()).unwrap());
 
-        app.device.poll(Maintain::Wait);
+        gc.device.poll(Maintain::Wait);
         rx.recv().unwrap();
 
         let data = screenshot_slice.get_mapped_range();

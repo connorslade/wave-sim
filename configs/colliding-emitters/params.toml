@@ -1,0 +1,10 @@
+size = [1920, 1080]
+
+shader = "shader.wgsl"
+
+dx = 0.0500
+dt = 0.0110
+
+v = 340.29
+amplitude = 0.008
+frequency = 4.0
