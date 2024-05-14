@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fs};
+use std::{borrow::Cow, f32::consts::PI, fs};
 
 use anyhow::{Context, Result};
 use encase::ShaderType;
@@ -22,7 +22,10 @@ pub struct Simulation {
     pub tick: usize,
     pub running: bool,
 
-    pub c: f32,
+    pub v: f32,  // [length][time]^-1
+    pub dt: f32, // [time]
+    pub dx: f32, // [length]
+
     pub amplitude: f32,
     pub oscillation: f32,
 }
@@ -112,7 +115,9 @@ impl Simulation {
             tick: 0,
             running: false,
 
-            c: args.c,
+            v: 340.29,
+            dt: 0.011,
+            dx: 0.05,
             amplitude: args.amplitude,
             oscillation: args.oscillation,
         })
@@ -187,9 +192,9 @@ impl Simulation {
             window_height: window_size.height,
             tick: self.tick as u32,
 
-            c: self.c,
+            c: 0.002 * self.dt * self.v / self.dx,
             amplitude: self.amplitude,
-            oscillation: self.oscillation,
+            oscillation: 2.0 * PI / (1000.0 * self.oscillation * self.dt),
         };
 
         device.create_buffer_init(&BufferInitDescriptor {

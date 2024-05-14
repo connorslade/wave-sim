@@ -69,7 +69,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             ) * wall;
     }
 
-    next_states[i] += ctx.amplitude * distance * cos(f32(ctx.tick) / ctx.oscillation);
+    next_states[i] += ctx.amplitude * distance * cos(f32(ctx.tick) * ctx.oscillation);
 
     tick(x, y);
 }

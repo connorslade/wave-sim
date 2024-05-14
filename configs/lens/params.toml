@@ -1,6 +1,6 @@
 size = [1920, 1080]
 
-map = "axicon-map.png"
+map = "gradient-index-map.png"
 
 c = 0.15
 amplitude = 0.005

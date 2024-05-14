@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use ::egui::{Color32, RichText, Slider};
 use anyhow::{Context, Result};
 use egui::Egui;
 use image::ImageFormat;
@@ -205,19 +206,45 @@ impl<'a> App<'a> {
                         ui.label(format!("FPS: {fps:.2}"));
                         ui.label(format!("Tick: {}", self.simulation.tick));
 
+                        let c = 0.002 * self.simulation.dt * self.simulation.v / self.simulation.dx;
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Courant: {c:.2}"));
+                            if c > 0.7 {
+                                ui.label(
+                                    RichText::new(format!("CFL not met. (c < 0.7)"))
+                                        .color(Color32::RED),
+                                );
+                            } else if c == 0.0 {
+                                ui.label(RichText::new(format!("C is zero.")).color(Color32::RED));
+                            }
+                        });
+
+                        ui.separator();
+
+                        ui.add(Slider::new(&mut self.target_fps, 30..=1000).text("Target FPS"));
+
+                        ui.separator();
+
+                        ui.add(Slider::new(&mut self.simulation.dx, 0.0..=10.0).text("dx (m)"));
+                        ui.add(Slider::new(&mut self.simulation.dt, 0.0..=0.1).text("dt (ms)"));
+                        ui.add(
+                            Slider::new(&mut self.simulation.v, 0.0..=300_000_000.0)
+                                .text("Wave Speed"),
+                        );
+
+                        self.simulation.dx = self.simulation.dx.max(0.00001);
+                        self.simulation.dt = self.simulation.dt.max(0.00001);
+                        self.simulation.v = self.simulation.v.max(0.00001);
+
                         ui.separator();
 
                         ui.add(
-                            ::egui::Slider::new(&mut self.target_fps, 30..=1000).text("Target FPS"),
-                        );
-                        ui.add(::egui::Slider::new(&mut self.simulation.c, 0.0..=0.7).text("C"));
-                        ui.add(
-                            ::egui::Slider::new(&mut self.simulation.amplitude, 0.0..=0.05)
+                            Slider::new(&mut self.simulation.amplitude, 0.0..=0.05)
                                 .text("Amplitude"),
                         );
                         ui.add(
-                            ::egui::Slider::new(&mut self.simulation.oscillation, 1.0..=1000.0)
-                                .text("Oscillation"),
+                            Slider::new(&mut self.simulation.oscillation, 0.0..=50.0)
+                                .text("Oscillation (kHz)"),
                         );
 
                         ui.separator();

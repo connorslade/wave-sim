@@ -23,16 +23,6 @@ fn index(x: u32, y: u32) -> u32 {
     return y * ctx.width + x;
 }
 
-fn get_map(x: u32, y: u32) -> vec4<u32> {
-    let value = map[y * ctx.width + x];
-    return vec4<u32>(
-        value & 0xFF,
-        (value >> 8) & 0xFF,
-        (value >> 16) & 0xFF,
-        (value >> 24) & 0xFF,
-    );
-}
-
 @compute
 @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
