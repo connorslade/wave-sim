@@ -27,15 +27,22 @@ pub struct Args {
     #[arg(long, short)]
     pub map: Option<PathBuf>,
 
-    /// Initial c value.
-    #[arg(short, long, default_value_t = 0.02)]
-    pub c: f32,
+    /// Time step (ms).
+    #[arg(short, long, default_value_t = 0.011)]
+    pub dt: f32,
+    /// Space step (mm).
+    #[arg(short, long, default_value_t = 0.05)]
+    pub dx: f32,
+
+    /// Wave velocity m/s.
+    #[arg(short, long, default_value_t = 340.29)]
+    pub v: f32,
     /// Initial oscillator amplitude.
     #[arg(short, long, default_value_t = 0.005)]
     pub amplitude: f32,
-    /// Initial oscillator frequency.
-    #[arg(short, long, default_value_t = 30.0)]
-    pub oscillation: f32,
+    /// Initial oscillator frequency in Hz.
+    #[arg(short, long, default_value_t = 0.04)]
+    pub frequency: f32,
 }
 
 #[derive(Parser, Debug)]

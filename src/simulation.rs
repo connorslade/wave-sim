@@ -27,7 +27,7 @@ pub struct Simulation {
     pub dx: f32, // [length]
 
     pub amplitude: f32,
-    pub oscillation: f32,
+    pub frequency: f32,
 }
 
 #[derive(ShaderType)]
@@ -40,7 +40,7 @@ pub struct ShaderContext {
 
     c: f32,
     amplitude: f32,
-    oscillation: f32,
+    frequency: f32,
 }
 
 impl Simulation {
@@ -115,11 +115,12 @@ impl Simulation {
             tick: 0,
             running: false,
 
-            v: 340.29,
-            dt: 0.011,
-            dx: 0.05,
+            dt: args.dt,
+            dx: args.dx,
+
+            v: args.v,
             amplitude: args.amplitude,
-            oscillation: args.oscillation,
+            frequency: args.frequency,
         })
     }
 
@@ -194,11 +195,11 @@ impl Simulation {
 
             c: 0.002 * self.dt * self.v / self.dx,
             amplitude: self.amplitude,
-            oscillation: 2.0 * PI / (1000.0 * self.oscillation * self.dt),
+            frequency: 0.0002 * PI * self.dt / (self.frequency * 1000.0).recip(),
         };
 
         device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Context Buffer"),
+            label: None,
             contents: &context.to_wgsl_bytes(),
             usage: BufferUsages::UNIFORM,
         })
