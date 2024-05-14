@@ -13,6 +13,7 @@ egui-wgpu = "0.27.2"
 egui-winit = "0.27.2"
 encase = "0.8.0"
 image = "0.25.1"
+num-traits = "0.2.19"
 pollster = { version = "0.3.0", features = ["macro"] }
 serde = { version = "1.0.201", features = ["derive"] }
 soon = { git = "https://github.com/connorslade/misc" }

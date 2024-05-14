@@ -1,31 +1,36 @@
 use std::time::{Duration, Instant};
 
 use egui::{emath::Numeric, Color32, Context, DragValue, RichText, Slider, Ui, Window};
-use spin_sleep_util::Interval;
 
-use crate::simulation::Simulation;
+use crate::{simulation::Simulation, FpsTracker, GraphicsContext};
 
-pub fn ui(
-    ctx: &Context,
-    queue: &wgpu::Queue,
-    simulation: &mut Simulation,
-    interval: &mut Interval,
-    last_frame: &mut Instant,
-    target_fps: &mut u32,
-    do_screenshot: &mut bool,
-) {
-    let now = Instant::now();
-    let frame_time = now - *last_frame;
-    *last_frame = now;
+pub struct Gui {
+    pub queue_screenshot: bool,
+    pub show_about: bool,
+}
 
-    Window::new("Wave Simulator")
+impl Gui {
+    pub fn ui(
+        &mut self,
+        ctx: &Context,
+        gc: &GraphicsContext,
+        simulation: &mut Simulation,
+        fps: &mut FpsTracker,
+    ) {
+        let now = Instant::now();
+        let frame_time = now - fps.last_frame;
+        fps.last_frame = now;
+
+        Window::new("Wave Simulator")
         .default_width(0.0)
         .show(ctx, |ui| {
             let size = simulation.get_size();
-            let fps = frame_time.as_secs_f64().recip();
-
+            let current_fps = frame_time.as_secs_f64().recip();
+            fps.fps_history.push(current_fps);
+            let avg_fps = fps.fps_history.avg();
+            
             ui.label(format!("Size: {}x{}", size.0, size.1));
-            ui.label(format!("FPS: {fps:.2}"));
+            ui.label(format!("FPS: {avg_fps:.1}"));
             ui.label(format!("Tick: {}", simulation.tick));
 
             let c = 0.002 * simulation.dt * simulation.v / simulation.dx;
@@ -41,16 +46,16 @@ pub fn ui(
 
             ui.separator();
 
-            ui.add(Slider::new(target_fps, 30..=1000).text("Target FPS"));
+            ui.add(Slider::new(&mut fps.target_fps, 30..=1000).text("Target FPS"));
             ui.checkbox(&mut simulation.reflective_boundary, "Reflective Boundaries");
 
             ui.separator();
 
             dragger(ui, "dx (m)", &mut simulation.dx, |x| {
-                x.clamp_range(0.0..=f32::MAX).fixed_decimals(4)
+                x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
             });
             dragger(ui, "dt (ms)", &mut simulation.dt, |x| {
-                x.clamp_range(0.0..=f32::MAX).fixed_decimals(4)
+                x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
             });
             dragger(ui, "Wave Speed", &mut simulation.v, |x| {
                 x.clamp_range(0.0..=f32::MAX)
@@ -82,14 +87,32 @@ pub fn ui(
                     .on_hover_text("Reset simulation (R)")
                     .clicked()
                 {
-                    simulation.reset_states(queue);
+                    simulation.reset_states(&gc.queue);
                 }
 
-                *do_screenshot |= ui.button("📷").on_hover_text("Screenshot").clicked();
+                self.queue_screenshot |= ui.button("📷").on_hover_text("Screenshot").clicked();
+
+                self.show_about ^= ui.button("ℹ").on_hover_text("About").clicked();
             });
 
-            interval.set_period(Duration::from_secs_f64(1.0 / *target_fps as f64));
+            fps.interval.set_period(Duration::from_secs_f64(1.0 / fps.target_fps as f64));
         });
+
+        if self.show_about {
+            const DESCRIPTION: &str = "Wave Simulator is a GPU accelerated simulator for the discretized wave equation. Created by Connor Slade.";
+            Window::new("About").show(ctx, |ui| {
+                ui.label(DESCRIPTION);
+                ui.spacing();
+                ui.horizontal(|ui| {
+                    ui.label("Github:");
+                    ui.hyperlink_to(
+                        "@connorslade/wave-sim",
+                        "https://github.com/connorslade/wave-sim",
+                    );
+                })
+            });
+        }
+    }
 }
 
 fn dragger<Num: Numeric>(

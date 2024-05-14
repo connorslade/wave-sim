@@ -2591,6 +2591,7 @@ dependencies = [
  "egui-winit",
  "encase",
  "image",
+ "num-traits",
  "pollster",
  "serde",
  "soon",

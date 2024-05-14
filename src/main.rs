@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use egui::Egui;
 use image::ImageFormat;
 use spin_sleep_util::Interval;
+use ui::Gui;
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
     Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
@@ -22,9 +23,11 @@ use winit::{
 
 mod args;
 mod egui;
+mod misc;
 mod renderer;
 mod simulation;
 mod ui;
+use misc::RingBuffer;
 use renderer::Renderer;
 use simulation::Simulation;
 
@@ -35,12 +38,11 @@ struct App<'a> {
     graphics: GraphicsContext<'a>,
     simulation: Simulation,
     renderer: Renderer,
-    egui: Egui,
 
-    target_fps: u32,
-    interval: Interval,
-    last_frame: Instant,
-    queue_screenshot: bool,
+    egui: Egui,
+    gui: Gui,
+
+    fps: FpsTracker,
 }
 
 struct GraphicsContext<'a> {
@@ -48,6 +50,13 @@ struct GraphicsContext<'a> {
     surface: Surface<'a>,
     device: Device,
     queue: Queue,
+}
+
+struct FpsTracker {
+    fps_history: RingBuffer<f64, 256>,
+    target_fps: u32,
+    interval: Interval,
+    last_frame: Instant,
 }
 
 #[pollster::main]
@@ -80,7 +89,7 @@ async fn main() -> Result<()> {
     let icon = image::load_from_memory_with_format(ICON, ImageFormat::Png).unwrap();
     let window = Arc::new(
         WindowBuilder::new()
-            .with_title("Wave Simulator | Connor Slade")
+            .with_title("Wave Simulator")
             .with_window_icon(Some(
                 Icon::from_rgba(icon.to_rgba8().to_vec(), icon.width(), icon.height()).unwrap(),
             ))
@@ -93,21 +102,25 @@ async fn main() -> Result<()> {
     let egui = Egui::new(&device, &window);
 
     let mut app = App {
+        simulation,
+        renderer,
+        egui,
         graphics: GraphicsContext {
             window,
             surface,
             device,
             queue,
         },
-
-        simulation,
-        renderer,
-        egui,
-
-        target_fps: 60,
-        interval: spin_sleep_util::interval(Duration::from_secs_f64(60_f64.recip())),
-        last_frame: Instant::now(),
-        queue_screenshot: false,
+        gui: Gui {
+            queue_screenshot: false,
+            show_about: false,
+        },
+        fps: FpsTracker {
+            fps_history: RingBuffer::new(),
+            target_fps: 60,
+            interval: spin_sleep_util::interval(Duration::from_secs_f64(60_f64.recip())),
+            last_frame: Instant::now(),
+        },
     };
 
     app.configure_surface();
@@ -167,17 +180,8 @@ impl<'a> App<'a> {
 
         self.renderer
             .render(self, &mut encoder, &context_buffer, &view);
-
         self.egui.render(gc, &mut encoder, &view, |ctx| {
-            ui::ui(
-                ctx,
-                &gc.queue,
-                &mut self.simulation,
-                &mut self.interval,
-                &mut self.last_frame,
-                &mut self.target_fps,
-                &mut self.queue_screenshot,
-            );
+            self.gui.ui(ctx, gc, &mut self.simulation, &mut self.fps);
         });
 
         gc.queue.submit([encoder.finish()]);
@@ -185,14 +189,14 @@ impl<'a> App<'a> {
         output.present();
         gc.window.request_redraw();
 
-        if self.queue_screenshot {
-            self.queue_screenshot = false;
+        if self.gui.queue_screenshot {
+            self.gui.queue_screenshot = false;
             if let Err(e) = self.renderer.screenshot(self) {
                 eprintln!("Failed to take screenshot: {:?}", e);
             }
         }
 
-        self.interval.tick();
+        self.fps.interval.tick();
     }
 
     fn configure_surface(&mut self) {
