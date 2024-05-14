@@ -35,6 +35,11 @@ impl<T, const SIZE: usize> RingBuffer<T, SIZE> {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.index = 0;
+        self.filled = false;
+    }
+
     /// Gets the values that have actually been set.
     /// If self.filled is true, this will be the whole buffer,
     /// if not it will just be the values added by the user.

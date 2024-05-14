@@ -29,7 +29,7 @@ mod simulation;
 mod ui;
 use misc::RingBuffer;
 use renderer::Renderer;
-use simulation::Simulation;
+use simulation::{Simulation, SimulationFlags};
 
 const ICON: &[u8] = include_bytes!("assets/icon.png");
 const TEXTURE_FORMAT: TextureFormat = TextureFormat::Bgra8Unorm;
@@ -144,11 +144,15 @@ async fn main() -> Result<()> {
                     device_id: _,
                     event,
                     is_synthetic: _,
-                } => {
-                    let pressed = event.state.is_pressed();
+                } if event.state.is_pressed() => {
                     app.simulation.running ^=
-                        event.physical_key == PhysicalKey::Code(KeyCode::Space) && pressed;
-                    if event.physical_key == PhysicalKey::Code(KeyCode::KeyR) && pressed {
+                        event.physical_key == PhysicalKey::Code(KeyCode::Space);
+
+                    if event.physical_key == PhysicalKey::Code(KeyCode::KeyE) {
+                        app.simulation.flags.toggle(SimulationFlags::ENERGY_VIEW);
+                    }
+
+                    if event.physical_key == PhysicalKey::Code(KeyCode::KeyR) {
                         app.simulation.reset_states(&app.graphics.queue);
                     }
                 }

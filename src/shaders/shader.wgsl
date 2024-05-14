@@ -4,7 +4,7 @@ fn tick(x: u32, y: u32) {} // Populated at runtime
 @group(0) @binding(1) var<storage> map: array<u32>;
 
 @group(0) @binding(2) var<storage, read_write> next_states: array<f32>;
-@group(0) @binding(3) var<storage, read_write> states: array<f32>;
+@group(0) @binding(3) var<storage, read> states: array<f32>;
 @group(0) @binding(4) var<storage, read> last_states: array<f32>;
 
 struct Context {
@@ -12,9 +12,11 @@ struct Context {
     height: u32,
     window_width: u32,
     window_height: u32,
-    
+
     tick: u32,
     flags: u32,
+    // 1 << 0: reflective boundary
+    // 1 << 1: energy_view
 
     c: f32,
     amplitude: f32,

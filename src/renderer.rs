@@ -63,6 +63,11 @@ impl Renderer {
             source: ShaderSource::Wgsl(include_str!("shaders/render.wgsl").into()),
         });
 
+        let state_layout_type = BindingType::Buffer {
+            ty: BufferBindingType::Storage { read_only: true },
+            has_dynamic_offset: false,
+            min_binding_size: BufferSize::new(pixels as u64 * 4),
+        };
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -79,11 +84,13 @@ impl Renderer {
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(pixels as u64 * 4),
-                    },
+                    ty: state_layout_type,
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: state_layout_type,
                     count: None,
                 },
             ],
@@ -164,6 +171,13 @@ impl Renderer {
                 BindGroupEntry {
                     binding: 1,
                     resource: app.simulation.get_state().as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: app
+                        .simulation
+                        .get_average_energy_buffer()
+                        .as_entire_binding(),
                 },
             ],
             label: None,

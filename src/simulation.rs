@@ -1,27 +1,29 @@
 use std::{borrow::Cow, f32::consts::PI, fs};
 
 use anyhow::{Context, Result};
+use bitflags::bitflags;
 use encase::ShaderType;
 use image::{io::Reader, DynamicImage, GenericImage};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferUsages, CommandEncoder,
-    ComputePassDescriptor, ComputePipelineDescriptor, Device, Queue, ShaderModuleDescriptor,
-    ShaderSource,
+    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, Queue,
+    ShaderModuleDescriptor, ShaderSource,
 };
 use winit::dpi::PhysicalSize;
 
 use crate::args::Args;
 
 pub struct Simulation {
-    compute_pipeline: wgpu::ComputePipeline,
+    compute_pipeline: ComputePipeline,
     states: [Buffer; 3],
     map_buffer: Option<Buffer>,
+    average_energy_buffer: Buffer,
     size: (u32, u32),
 
     pub tick: usize,
     pub running: bool,
-    pub reflective_boundary: bool,
+    pub flags: SimulationFlags,
 
     pub v: f32,  // [length][time]^-1
     pub dt: f32, // [time]
@@ -29,6 +31,14 @@ pub struct Simulation {
 
     pub amplitude: f32,
     pub frequency: f32,
+}
+
+bitflags! {
+    #[derive(Clone, Copy)]
+    pub struct SimulationFlags: u32 {
+        const REFLECTIVE_BOUNDARY = 0b0001;
+        const ENERGY_VIEW = 0b0010;
+    }
 }
 
 #[derive(ShaderType)]
@@ -100,7 +110,8 @@ impl Simulation {
         };
         let state_buffer_1 = device.create_buffer_init(&state_buffer_descriptor.clone());
         let state_buffer_2 = device.create_buffer_init(&state_buffer_descriptor.clone());
-        let state_buffer_3 = device.create_buffer_init(&state_buffer_descriptor);
+        let state_buffer_3 = device.create_buffer_init(&state_buffer_descriptor.clone());
+        let average_energy_buffer = device.create_buffer_init(&state_buffer_descriptor);
 
         let compute_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: None,
@@ -109,15 +120,21 @@ impl Simulation {
             entry_point: "main",
         });
 
+        let mut flags = SimulationFlags::empty();
+        if args.reflective_boundary {
+            flags |= SimulationFlags::REFLECTIVE_BOUNDARY;
+        }
+
         Ok(Self {
             compute_pipeline,
             states: [state_buffer_1, state_buffer_2, state_buffer_3],
             map_buffer,
+            average_energy_buffer,
             size: args.size,
 
             tick: 0,
             running: false,
-            reflective_boundary: args.reflective_boundary,
+            flags,
 
             dt: args.dt,
             dx: args.dx,
@@ -128,8 +145,12 @@ impl Simulation {
         })
     }
 
-    pub fn get_state(&self) -> &wgpu::Buffer {
+    pub fn get_state(&self) -> &Buffer {
         &self.states[self.tick % 3]
+    }
+
+    pub fn get_average_energy_buffer(&self) -> &Buffer {
+        &self.average_energy_buffer
     }
 
     pub fn get_size(&self) -> (u32, u32) {
@@ -167,6 +188,10 @@ impl Simulation {
                 binding: 4,
                 resource: self.states[(self.tick + 1) % 3].as_entire_binding(),
             },
+            BindGroupEntry {
+                binding: 5,
+                resource: self.average_energy_buffer.as_entire_binding(),
+            },
         ];
         if let Some(ref map) = self.map_buffer {
             entries.push(BindGroupEntry {
@@ -197,7 +222,7 @@ impl Simulation {
             window_height: window_size.height,
 
             tick: self.tick as u32,
-            flags: self.reflective_boundary as u32,
+            flags: self.flags.bits(),
 
             c: 0.002 * self.dt * self.v / self.dx,
             amplitude: self.amplitude,
