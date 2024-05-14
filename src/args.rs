@@ -16,6 +16,9 @@ pub struct Args {
     /// The size of the simulation.
     #[arg(short, long, value_parser = ValueParser::new(parse_size))]
     pub size: (u32, u32),
+    /// Reflective Boundaries
+    #[arg(short, long, default_value_t = false)]
+    pub reflective_boundary: bool,
 
     /// The path to the shader file.
     #[arg(long, alias = "sh")]
@@ -28,10 +31,10 @@ pub struct Args {
     pub map: Option<PathBuf>,
 
     /// Time step (ms).
-    #[arg(short, long, default_value_t = 0.011)]
+    #[arg(short = 't', long, default_value_t = 0.011)]
     pub dt: f32,
     /// Space step (mm).
-    #[arg(short, long, default_value_t = 0.05)]
+    #[arg(short = 'x', long, default_value_t = 0.05)]
     pub dx: f32,
 
     /// Wave velocity m/s.

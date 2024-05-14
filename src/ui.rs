@@ -42,6 +42,7 @@ pub fn ui(
             ui.separator();
 
             ui.add(Slider::new(target_fps, 30..=1000).text("Target FPS"));
+            ui.checkbox(&mut simulation.reflective_boundary, "Reflective Boundaries");
 
             ui.separator();
 

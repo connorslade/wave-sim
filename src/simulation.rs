@@ -21,6 +21,7 @@ pub struct Simulation {
 
     pub tick: usize,
     pub running: bool,
+    pub reflective_boundary: bool,
 
     pub v: f32,  // [length][time]^-1
     pub dt: f32, // [time]
@@ -36,7 +37,9 @@ pub struct ShaderContext {
     height: u32,
     window_width: u32,
     window_height: u32,
+
     tick: u32,
+    flags: u32,
 
     c: f32,
     amplitude: f32,
@@ -114,6 +117,7 @@ impl Simulation {
 
             tick: 0,
             running: false,
+            reflective_boundary: args.reflective_boundary,
 
             dt: args.dt,
             dx: args.dx,
@@ -191,7 +195,9 @@ impl Simulation {
             height: self.size.1,
             window_width: window_size.width,
             window_height: window_size.height,
+
             tick: self.tick as u32,
+            flags: self.reflective_boundary as u32,
 
             c: 0.002 * self.dt * self.v / self.dx,
             amplitude: self.amplitude,

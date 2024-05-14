@@ -1,4 +1,5 @@
 size = [1920, 1080]
+reflective_boundary = false
 
 shader = "shader.wgsl"
 
