@@ -1,10 +1,10 @@
 use egui::{Context, ViewportId};
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use egui_winit::State;
-use wgpu::{CommandEncoder, Device, RenderPassDescriptor, TextureFormat, TextureView};
+use wgpu::{CommandEncoder, Device, RenderPassDescriptor, TextureView};
 use winit::event::WindowEvent;
 
-use crate::GraphicsContext;
+use crate::{GraphicsContext, TEXTURE_FORMAT};
 
 pub struct Egui {
     state: State,
@@ -16,7 +16,7 @@ impl Egui {
         let context = Context::default();
 
         let state = State::new(context, ViewportId::ROOT, window, None, None);
-        let renderer = Renderer::new(device, TextureFormat::Bgra8Unorm, None, 1);
+        let renderer = Renderer::new(device, TEXTURE_FORMAT, None, 1);
 
         Self { state, renderer }
     }
@@ -70,9 +70,10 @@ impl Egui {
         self.renderer
             .render(&mut render_pass, &clipped_primitives, &screen);
 
-        // for texture in output.textures_delta.free {
-        //     self.renderer.free_texture(&texture);
-        // }
+        drop(render_pass);
+        for texture in output.textures_delta.free {
+            self.renderer.free_texture(&texture);
+        }
     }
 
     pub fn handle_event(&mut self, gc: &GraphicsContext, event: &WindowEvent) {

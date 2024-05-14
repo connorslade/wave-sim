@@ -29,6 +29,7 @@ use renderer::Renderer;
 use simulation::Simulation;
 
 const ICON: &[u8] = include_bytes!("assets/icon.png");
+const TEXTURE_FORMAT: TextureFormat = TextureFormat::Bgra8Unorm;
 
 struct App<'a> {
     graphics: GraphicsContext<'a>,
@@ -88,21 +89,6 @@ async fn main() -> Result<()> {
 
     let surface = instance.create_surface(window.clone()).unwrap();
 
-    let size = window.inner_size();
-    surface.configure(
-        &device,
-        &SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT,
-            format: TextureFormat::Bgra8Unorm,
-            width: size.width,
-            height: size.height,
-            present_mode: PresentMode::Immediate,
-            desired_maximum_frame_latency: 2,
-            alpha_mode: CompositeAlphaMode::Opaque,
-            view_formats: vec![],
-        },
-    );
-
     let egui = Egui::new(&device, &window);
 
     let mut app = App {
@@ -118,12 +104,13 @@ async fn main() -> Result<()> {
         egui,
 
         target_fps: 60,
-        interval: spin_sleep_util::interval(Duration::from_secs_f64(1.0 / 60.0)),
+        interval: spin_sleep_util::interval(Duration::from_secs_f64(60_f64.recip())),
         last_frame: Instant::now(),
     };
 
-    event_loop.set_control_flow(ControlFlow::Poll);
+    app.configure_surface();
 
+    event_loop.set_control_flow(ControlFlow::Poll);
     event_loop.run(|event, event_loop| {
         if let Event::WindowEvent {
             window_id: _,
@@ -137,21 +124,7 @@ async fn main() -> Result<()> {
             match event {
                 WindowEvent::CloseRequested => event_loop.exit(),
                 WindowEvent::RedrawRequested => app.render(),
-                WindowEvent::Resized(size) => {
-                    app.graphics.surface.configure(
-                        &app.graphics.device,
-                        &SurfaceConfiguration {
-                            usage: TextureUsages::RENDER_ATTACHMENT,
-                            format: TextureFormat::Bgra8Unorm,
-                            width: size.width,
-                            height: size.height,
-                            present_mode: PresentMode::Immediate,
-                            desired_maximum_frame_latency: 2,
-                            alpha_mode: CompositeAlphaMode::Opaque,
-                            view_formats: vec![],
-                        },
-                    );
-                }
+                WindowEvent::Resized(_size) => app.configure_surface(),
                 WindowEvent::KeyboardInput {
                     device_id: _,
                     event,
@@ -215,5 +188,22 @@ impl<'a> App<'a> {
         }
 
         self.interval.tick();
+    }
+
+    fn configure_surface(&mut self) {
+        let size = self.graphics.window.inner_size();
+        self.graphics.surface.configure(
+            &self.graphics.device,
+            &SurfaceConfiguration {
+                usage: TextureUsages::RENDER_ATTACHMENT,
+                format: TEXTURE_FORMAT,
+                width: size.width,
+                height: size.height,
+                present_mode: PresentMode::Immediate,
+                desired_maximum_frame_latency: 2,
+                alpha_mode: CompositeAlphaMode::Opaque,
+                view_formats: vec![],
+            },
+        );
     }
 }

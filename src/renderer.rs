@@ -12,13 +12,13 @@ use wgpu::{
     LoadOp, Maintain, MapMode, MultisampleState, Operations, Origin3d, PipelineLayoutDescriptor,
     PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
     RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp,
-    TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
+    TextureAspect, TextureDescriptor, TextureDimension, TextureUsages, TextureView,
     TextureViewDescriptor, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
     VertexStepMode,
 };
 use winit::dpi::PhysicalSize;
 
-use crate::{simulation::ShaderContext, App};
+use crate::{simulation::ShaderContext, App, TEXTURE_FORMAT};
 
 pub struct Renderer {
     render_pipeline: RenderPipeline,
@@ -124,7 +124,7 @@ impl Renderer {
                 module: &render_shader,
                 entry_point: "frag",
                 targets: &[Some(ColorTargetState {
-                    format: TextureFormat::Bgra8Unorm,
+                    format: TEXTURE_FORMAT,
                     blend: None,
                     write_mask: ColorWrites::all(),
                 })],
@@ -207,7 +207,7 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Bgra8Unorm,
+            format: TEXTURE_FORMAT,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
             view_formats: &[],
         });
