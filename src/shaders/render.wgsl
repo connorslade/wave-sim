@@ -68,6 +68,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
         let scheme_index = u32(val * 3.0);
         val = val * 3.0 - f32(scheme_index);
 
+        // clean code i swear
         var color = vec3<f32>(0.0, 0.0, 0.0);
         if (scheme_index == 0) {
             color = COLOR_SCHEME[0] * (1.0 - val) + COLOR_SCHEME[1] * val;

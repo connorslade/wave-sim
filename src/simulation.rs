@@ -247,6 +247,15 @@ impl Simulation {
             )
         }
     }
+
+    pub fn reset_average_energy(&mut self, queue: &Queue) {
+        let empty_buffer = vec![0f32; (self.size.0 * self.size.1) as usize];
+        queue.write_buffer(
+            &self.average_energy_buffer,
+            BufferAddress::default(),
+            bytemuck::cast_slice(&empty_buffer),
+        )
+    }
 }
 
 impl ShaderContext {

@@ -111,10 +111,16 @@ impl Gui {
 
                     if ui
                         .button("⟳")
-                        .on_hover_text("Reset simulation (R)")
+                        .on_hover_text(
+                            "Reset simulation (R)\nHold shift to only reset average energy.",
+                        )
                         .clicked()
                     {
-                        simulation.reset_states(&gc.queue);
+                        if ui.input(|i| i.modifiers.shift) {
+                            simulation.reset_average_energy(&gc.queue);
+                        } else {
+                            simulation.reset_states(&gc.queue);
+                        }
                     }
 
                     self.queue_screenshot |= ui.button("📷").on_hover_text("Screenshot").clicked();
