@@ -40,6 +40,7 @@ struct App<'a> {
     target_fps: u32,
     interval: Interval,
     last_frame: Instant,
+    queue_screenshot: bool,
 }
 
 struct GraphicsContext<'a> {
@@ -106,6 +107,7 @@ async fn main() -> Result<()> {
         target_fps: 60,
         interval: spin_sleep_util::interval(Duration::from_secs_f64(60_f64.recip())),
         last_frame: Instant::now(),
+        queue_screenshot: false,
     };
 
     app.configure_surface();
@@ -130,9 +132,12 @@ async fn main() -> Result<()> {
                     event,
                     is_synthetic: _,
                 } => {
-                    app.simulation.running ^= event.physical_key
-                        == PhysicalKey::Code(KeyCode::Space)
-                        && event.state.is_pressed();
+                    let pressed = event.state.is_pressed();
+                    app.simulation.running ^=
+                        event.physical_key == PhysicalKey::Code(KeyCode::Space) && pressed;
+                    if event.physical_key == PhysicalKey::Code(KeyCode::KeyR) && pressed {
+                        app.simulation.reset_states(&app.graphics.queue);
+                    }
                 }
                 _ => {}
             }
@@ -163,7 +168,6 @@ impl<'a> App<'a> {
         self.renderer
             .render(self, &mut encoder, &context_buffer, &view);
 
-        let mut do_screenshot = false;
         self.egui.render(gc, &mut encoder, &view, |ctx| {
             ui::ui(
                 ctx,
@@ -172,7 +176,7 @@ impl<'a> App<'a> {
                 &mut self.interval,
                 &mut self.last_frame,
                 &mut self.target_fps,
-                &mut do_screenshot,
+                &mut self.queue_screenshot,
             );
         });
 
@@ -181,7 +185,8 @@ impl<'a> App<'a> {
         output.present();
         gc.window.request_redraw();
 
-        if do_screenshot {
+        if self.queue_screenshot {
+            self.queue_screenshot = false;
             if let Err(e) = self.renderer.screenshot(self) {
                 eprintln!("Failed to take screenshot: {:?}", e);
             }

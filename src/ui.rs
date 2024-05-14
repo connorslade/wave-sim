@@ -31,10 +31,11 @@ pub fn ui(
             let c = 0.002 * simulation.dt * simulation.v / simulation.dx;
             ui.horizontal(|ui| {
                 ui.label(format!("Courant: {c:.2}"));
+                const TIP: &str = "When the Courant number is not in (0, 0.7], the simulation may become unstable.";
                 if c > 0.7 {
-                    ui.label(RichText::new("CFL not met. (c < 0.7)").color(Color32::RED));
+                    ui.label(RichText::new("CFL not met. (c < 0.7)").color(Color32::RED)).on_hover_text(TIP);
                 } else if c == 0.0 {
-                    ui.label(RichText::new("C is zero.").color(Color32::RED));
+                    ui.label(RichText::new("C is zero.").color(Color32::RED)).on_hover_text(TIP);
                 }
             });
 
@@ -66,20 +67,24 @@ pub fn ui(
             ui.separator();
 
             ui.horizontal(|ui| {
-                if ui
+                simulation.running ^= ui
                     .button(if simulation.running { "⏸" } else { "▶" })
+                    .on_hover_text(if simulation.running {
+                        "Pause simulation (Space)"
+                    } else {
+                        "Resume simulation (Space)"
+                    })
+                    .clicked();
+
+                if ui
+                    .button("⟳")
+                    .on_hover_text("Reset simulation (R)")
                     .clicked()
                 {
-                    simulation.running ^= true;
-                }
-
-                if ui.button("⟳").clicked() {
                     simulation.reset_states(queue);
                 }
 
-                if ui.button("📷").clicked() {
-                    *do_screenshot = true;
-                }
+                *do_screenshot |= ui.button("📷").on_hover_text("Screenshot").clicked();
             });
 
             interval.set_period(Duration::from_secs_f64(1.0 / *target_fps as f64));
