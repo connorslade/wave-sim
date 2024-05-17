@@ -3,9 +3,9 @@ reflective_boundary = false
 
 shader = "shader.wgsl"
 
-dt = 0.04
+dt = 0.0400
 dx = 0.05
 
 v = 340.29
-amplitude = 0.08
+amplitude = 2.0
 frequency = 4.0

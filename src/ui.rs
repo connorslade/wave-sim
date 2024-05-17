@@ -116,9 +116,8 @@ impl Gui {
                         )
                         .clicked()
                     {
-                        if ui.input(|i| i.modifiers.shift) {
-                            simulation.reset_average_energy(&gc.queue);
-                        } else {
+                        simulation.reset_average_energy(&gc.queue);
+                        if ui.input(|i| !i.modifiers.shift) {
                             simulation.reset_states(&gc.queue);
                         }
                     }

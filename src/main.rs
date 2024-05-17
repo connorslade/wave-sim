@@ -154,6 +154,7 @@ async fn main() -> Result<()> {
 
                     if event.physical_key == PhysicalKey::Code(KeyCode::KeyR) {
                         app.simulation.reset_states(&app.graphics.queue);
+                        app.simulation.reset_average_energy(&app.graphics.queue);
                     }
                 }
                 _ => {}

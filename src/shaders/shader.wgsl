@@ -7,6 +7,8 @@ fn tick(x: u32, y: u32) {} // Populated at runtime
 @group(0) @binding(3) var<storage, read> states: array<f32>;
 @group(0) @binding(4) var<storage, read> last_states: array<f32>;
 
+@group(0) @binding(5) var<storage, read_write> average_energy: array<f32>;
+
 struct Context {
     width: u32,
     height: u32,
@@ -64,4 +66,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         );
 
     tick(x, y);
+
+    let nd = f32(ctx.tick) + 1.0;
+    average_energy[i] = average_energy[i] * (f32(ctx.tick) / nd) + pow(next_states[i], 2.0) / nd; 
 }

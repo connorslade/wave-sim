@@ -211,7 +211,7 @@ impl Simulation {
         });
         compute_pass.set_pipeline(&self.compute_pipeline);
         compute_pass.set_bind_group(0, &bind_group, &[]);
-        compute_pass.dispatch_workgroups(self.size.0 / 8, self.size.1 / 8, 1);
+        compute_pass.dispatch_workgroups(self.size.0.div_ceil(8), self.size.1.div_ceil(8), 1);
     }
 
     pub fn get_context_buffer(&self, device: &Device, window_size: PhysicalSize<u32>) -> Buffer {
