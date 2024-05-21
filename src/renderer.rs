@@ -2,7 +2,7 @@ use std::{fs, mem, path::Path};
 
 use anyhow::Result;
 use bytemuck::{Pod, Zeroable};
-use image::{ImageBuffer, Rgba};
+use image::{GenericImageView, ImageBuffer, Rgba};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -14,7 +14,7 @@ use wgpu::{
     RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp,
     TextureAspect, TextureDescriptor, TextureDimension, TextureUsages, TextureView,
     TextureViewDescriptor, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
-    VertexStepMode,
+    VertexStepMode, COPY_BYTES_PER_ROW_ALIGNMENT,
 };
 use winit::dpi::PhysicalSize;
 
@@ -226,9 +226,11 @@ impl Renderer {
             view_formats: &[],
         });
 
+        const ALIGNMENT_BYTES: u64 = COPY_BYTES_PER_ROW_ALIGNMENT as u64 - 1;
+        let row_bytes = (size.0 as u64 * 4 + ALIGNMENT_BYTES) & !ALIGNMENT_BYTES;
         let screenshot_buffer = gc.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: (size.0 * size.1) as u64 * 4,
+            size: row_bytes * size.1 as u64,
             usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
@@ -251,7 +253,7 @@ impl Renderer {
                 buffer: &screenshot_buffer,
                 layout: ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(4 * size.0),
+                    bytes_per_row: Some(row_bytes as u32),
                     rows_per_image: None,
                 },
             },
@@ -277,12 +279,15 @@ impl Renderer {
         drop(data);
         screenshot_buffer.unmap();
 
-        let image = ImageBuffer::<Rgba<u8>, _>::from_vec(size.0, size.1, result).unwrap();
-        save_screenshot(image)
+        let image =
+            ImageBuffer::<Rgba<u8>, _>::from_vec(row_bytes as u32 / 4, size.1, result).unwrap();
+        save_screenshot(image, size)
     }
 }
 
-fn save_screenshot(mut image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<()> {
+fn save_screenshot(mut image: ImageBuffer<Rgba<u8>, Vec<u8>>, size: (u32, u32)) -> Result<()> {
+    image = image.view(0, 0, size.0, size.1).to_image();
+
     // Convert Bgra to Rgba
     for y in 0..image.height() {
         for x in 0..image.width() {
