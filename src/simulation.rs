@@ -16,12 +16,13 @@ use crate::args::Args;
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
-    states: [Buffer; 3],
+    states: Buffer,
     map_buffer: Option<Buffer>,
     average_energy_buffer: Buffer,
     size: (u32, u32),
 
-    pub tick: usize,
+    pub ticks_per_dispatch: u32,
+    pub tick: u64,
     pub running: bool,
     pub flags: SimulationFlags,
 
@@ -49,6 +50,7 @@ pub struct ShaderContext {
     window_height: u32,
 
     tick: u32,
+    ticks_per_dispatch: u32,
     flags: u32,
 
     c: f32,
@@ -102,15 +104,13 @@ impl Simulation {
             device.create_buffer_init(&map_buffer_descriptor)
         });
 
-        let empty_buffer = vec![0f32; (args.size.0 * args.size.1) as usize];
+        let empty_buffer = vec![0f32; (args.size.0 * args.size.1 * 3) as usize];
         let state_buffer_descriptor = BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&empty_buffer),
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         };
-        let state_buffer_1 = device.create_buffer_init(&state_buffer_descriptor.clone());
-        let state_buffer_2 = device.create_buffer_init(&state_buffer_descriptor.clone());
-        let state_buffer_3 = device.create_buffer_init(&state_buffer_descriptor.clone());
+        let state_buffer = device.create_buffer_init(&state_buffer_descriptor.clone());
         let average_energy_buffer = device.create_buffer_init(&state_buffer_descriptor);
 
         let compute_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
@@ -127,11 +127,12 @@ impl Simulation {
 
         Ok(Self {
             compute_pipeline,
-            states: [state_buffer_1, state_buffer_2, state_buffer_3],
+            states: state_buffer,
             map_buffer,
             average_energy_buffer,
             size: args.size,
 
+            ticks_per_dispatch: 1,
             tick: 0,
             running: false,
             flags,
@@ -146,7 +147,7 @@ impl Simulation {
     }
 
     pub fn get_state(&self) -> &Buffer {
-        &self.states[self.tick % 3]
+        &self.states
     }
 
     pub fn get_average_energy_buffer(&self) -> &Buffer {
@@ -167,7 +168,7 @@ impl Simulation {
             return;
         }
 
-        self.tick = self.tick.wrapping_add(1);
+        self.tick += self.ticks_per_dispatch as u64;
 
         let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
         let mut entries = vec![
@@ -175,21 +176,12 @@ impl Simulation {
                 binding: 0,
                 resource: context_buffer.as_entire_binding(),
             },
-            // 2 => next, 3 => last, 4 => last2
             BindGroupEntry {
                 binding: 2,
-                resource: self.states[self.tick % 3].as_entire_binding(),
+                resource: self.states.as_entire_binding(),
             },
             BindGroupEntry {
                 binding: 3,
-                resource: self.states[(self.tick + 2) % 3].as_entire_binding(),
-            },
-            BindGroupEntry {
-                binding: 4,
-                resource: self.states[(self.tick + 1) % 3].as_entire_binding(),
-            },
-            BindGroupEntry {
-                binding: 5,
                 resource: self.average_energy_buffer.as_entire_binding(),
             },
         ];
@@ -222,6 +214,7 @@ impl Simulation {
             window_height: window_size.height,
 
             tick: self.tick as u32,
+            ticks_per_dispatch: self.ticks_per_dispatch,
             flags: self.flags.bits(),
 
             c: 0.002 * self.dt * self.v / self.dx,
@@ -238,14 +231,12 @@ impl Simulation {
 
     pub fn reset_states(&mut self, queue: &Queue) {
         self.tick = 0;
-        let empty_buffer = vec![0f32; (self.size.0 * self.size.1) as usize];
-        for buffer in &self.states {
-            queue.write_buffer(
-                buffer,
-                BufferAddress::default(),
-                bytemuck::cast_slice(&empty_buffer),
-            )
-        }
+        let empty_buffer = vec![0f32; (self.size.0 * self.size.1 * 3) as usize];
+        queue.write_buffer(
+            &self.states,
+            BufferAddress::default(),
+            bytemuck::cast_slice(&empty_buffer),
+        )
     }
 
     pub fn reset_average_energy(&mut self, queue: &Queue) {

@@ -9,6 +9,7 @@ struct Context {
     window_height: u32,
 
     tick: u32,
+    ticks_per_dispatch: u32,
     flags: u32,
     // 1 << 0: reflective boundary
     // 1 << 1: energy_view
@@ -50,6 +51,10 @@ const COLOR_SCHEME: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
     vec3<f32>(1.0, 1.0, 1.0),
 );
 
+fn index(x: u32, y: u32, n: u32) -> u32 {
+    return (ctx.width * ctx.height * n) + (y * ctx.width) + x;
+}
+
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     let x_offset = ctx.window_width / 2 - ctx.width / 2;
@@ -85,7 +90,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(color, 1.0);
     }
 
-    let val = states[u32(y) * ctx.width + u32(x)];
+    let val = states[index(u32(x), u32(y), ctx.tick % 3)];
     let color = (
           vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0)
         + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0)

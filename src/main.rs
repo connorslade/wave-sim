@@ -54,9 +54,10 @@ struct GraphicsContext<'a> {
 
 struct FpsTracker {
     fps_history: RingBuffer<f64, 256>,
-    target_fps: u32,
-    interval: Interval,
     last_frame: Instant,
+
+    interval: Interval,
+    target_fps: u32,
 }
 
 #[pollster::main]

@@ -38,7 +38,13 @@ impl Gui {
                 let avg_fps = fps.fps_history.avg();
 
                 ui.label(format!("Size: {}x{}", size.0, size.1));
-                ui.label(format!("FPS: {avg_fps:.1}"));
+                ui.horizontal(|ui| {
+                    ui.label(format!("FPS: {avg_fps:.1}"));
+                    ui.label(format!(
+                        "UPS: {:.1}",
+                        avg_fps * simulation.ticks_per_dispatch as f64
+                    ));
+                });
                 ui.label(format!("Tick: {}", simulation.tick));
 
                 let c = 0.002 * simulation.dt * simulation.v / simulation.dx;
@@ -57,6 +63,18 @@ impl Gui {
 
                 let last_target_fps = fps.target_fps;
                 ui.add(Slider::new(&mut fps.target_fps, 30..=1000).text("Target FPS"));
+
+                if last_target_fps != fps.target_fps {
+                    fps.fps_history.reset();
+                    fps.interval
+                        .set_period(Duration::from_secs_f64(1.0 / fps.target_fps as f64));
+                }
+
+                ui.add(
+                    Slider::new(&mut simulation.ticks_per_dispatch, 1..=128)
+                        .text("Ticks per Dispatch"),
+                );
+
                 bit_checkbox(
                     ui,
                     "Reflective Boundaries",
@@ -69,12 +87,6 @@ impl Gui {
                     &mut simulation.flags,
                     SimulationFlags::ENERGY_VIEW,
                 );
-
-                if last_target_fps != fps.target_fps {
-                    fps.fps_history.reset();
-                    fps.interval
-                        .set_period(Duration::from_secs_f64(1.0 / fps.target_fps as f64));
-                }
 
                 ui.separator();
 
