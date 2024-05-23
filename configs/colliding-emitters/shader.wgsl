@@ -1,4 +1,5 @@
-let i = index(x, y);
+let next = ctx.tick % 3;
+let i = index(x, y, n);
 
 for (var j = -1.0; j < 2.0; j += 2.0) {
     let emitter = vec2<f32>(
@@ -6,5 +7,5 @@ for (var j = -1.0; j < 2.0; j += 2.0) {
         f32(ctx.height) / 2.0
     );
     let distance = distance(emitter, vec2<f32>(f32(x), f32(y)));
-    next_states[i] += 2.0 * ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
+    states[i] += 2.0 * ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
 }

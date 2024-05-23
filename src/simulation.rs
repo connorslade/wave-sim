@@ -17,7 +17,7 @@ use crate::{args::Args, GraphicsContext};
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
     states: Buffer,
-    map_buffer: Option<Buffer>,
+    map_buffer: Buffer,
     average_energy_buffer: Buffer,
     size: (u32, u32),
 
@@ -75,11 +75,7 @@ impl Simulation {
             })
             .transpose()?;
 
-        let mut raw_shader = if args.map.is_some() {
-            Cow::Borrowed(include_str!("shaders/shader_map.wgsl"))
-        } else {
-            Cow::Borrowed(include_str!("shaders/shader.wgsl"))
-        };
+        let mut raw_shader = Cow::Borrowed(include_str!("shaders/shader.wgsl"));
         if let Some(ref shader) = args.shader {
             let shader = fs::read_to_string(args.base_path().join(shader)).unwrap();
             let line_end = raw_shader.find('\n').unwrap();
@@ -94,15 +90,20 @@ impl Simulation {
             source: ShaderSource::Wgsl(raw_shader),
         });
 
-        let map_buffer = map.map(|map| {
-            let image_data = map.into_rgba8().into_raw();
-            let map_buffer_descriptor = BufferInitDescriptor {
-                label: None,
-                contents: image_data.as_slice(),
-                usage: BufferUsages::STORAGE,
-            };
-            device.create_buffer_init(&map_buffer_descriptor)
-        });
+        let map_data = match map {
+            Some(map) => map.into_rgba8().into_raw(),
+            None => {
+                let mut out = vec![0; (args.size.0 * args.size.1) as usize * 4];
+                out.chunks_exact_mut(4).for_each(|x| x[2] = 128);
+                out
+            }
+        };
+        let map_buffer_descriptor = BufferInitDescriptor {
+            label: None,
+            contents: map_data.as_slice(),
+            usage: BufferUsages::STORAGE,
+        };
+        let map_buffer = device.create_buffer_init(&map_buffer_descriptor);
 
         let empty_buffer = vec![0f32; (args.size.0 * args.size.1 * 3) as usize];
         let state_buffer_descriptor = BufferInitDescriptor {
@@ -174,30 +175,28 @@ impl Simulation {
             let buf = self.get_context_buffer(&gc.device, window_size);
 
             let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
-            let mut entries = vec![
-                BindGroupEntry {
-                    binding: 0,
-                    resource: buf.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 2,
-                    resource: self.states.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: self.average_energy_buffer.as_entire_binding(),
-                },
-            ];
-            if let Some(ref map) = self.map_buffer {
-                entries.push(BindGroupEntry {
-                    binding: 1,
-                    resource: map.as_entire_binding(),
-                });
-            }
+
             let bind_group = gc.device.create_bind_group(&BindGroupDescriptor {
                 label: None,
                 layout: &bind_group_layout,
-                entries: &entries,
+                entries: &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: buf.as_entire_binding(),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: self.map_buffer.as_entire_binding(),
+                    },
+                    BindGroupEntry {
+                        binding: 2,
+                        resource: self.states.as_entire_binding(),
+                    },
+                    BindGroupEntry {
+                        binding: 3,
+                        resource: self.average_energy_buffer.as_entire_binding(),
+                    },
+                ],
             });
 
             let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
