@@ -6,6 +6,9 @@ fn tick(x: u32, y: u32) {} // Populated at runtime
 @group(0) @binding(2) var<storage, read_write> states: array<f32>;
 @group(0) @binding(3) var<storage, read_write> average_energy: array<f32>;
 
+@group(0) @binding(4) var<storage, read> audio_in: array<f32>;
+@group(0) @binding(5) var<storage, read_write> audio_out: array<f32>;
+
 struct Context {
     width: u32,
     height: u32,
@@ -86,6 +89,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         ) * wall;
 
     states[ni] += ctx.amplitude * distance * cos(f32(ctx.tick) * ctx.oscillation);
+
+    if y == 540 && x == 250 {
+        audio_out[ctx.tick % 512] = states[ni];
+    }
+
+    let dst = distance(vec2<f32>(f32(x), f32(y)), vec2<f32>(f32(ctx.width) / 2.0, f32(ctx.height) / 2.0));
+    states[ni] += exp(-abs(dst)) * audio_in[ctx.tick];
 
     tick(x, y);
 

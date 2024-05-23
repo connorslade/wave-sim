@@ -1,14 +1,20 @@
-use std::{borrow::Cow, f32::consts::PI, fs};
+use std::{
+    borrow::Cow,
+    f32::consts::PI,
+    fs::{self, File},
+    io::BufWriter,
+};
 
 use anyhow::{Context, Result};
 use bitflags::bitflags;
 use encase::ShaderType;
+use hound::WavWriter;
 use image::{io::Reader, DynamicImage, GenericImage};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferUsages, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, Queue,
-    ShaderModuleDescriptor, ShaderSource,
+    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
+    CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
+    Maintain, MapMode, Queue, ShaderModuleDescriptor, ShaderSource,
 };
 use winit::dpi::PhysicalSize;
 
@@ -20,6 +26,11 @@ pub struct Simulation {
     map_buffer: Buffer,
     average_energy_buffer: Buffer,
     size: (u32, u32),
+
+    audio_in_buffer: Buffer,
+    audio_out_buffer: Buffer,
+    staging_buffer: Buffer,
+    audio_writer: Option<WavWriter<BufWriter<File>>>,
 
     pub ticks_per_dispatch: u32,
     pub tick: u64,
@@ -114,6 +125,29 @@ impl Simulation {
         let state_buffer = device.create_buffer_init(&state_buffer_descriptor.clone());
         let average_energy_buffer = device.create_buffer_init(&state_buffer_descriptor);
 
+        let audio_in = hound::WavReader::open("configs/reverb/input.wav")?
+            .samples::<f32>()
+            .collect::<Result<Vec<_>, hound::Error>>()?;
+        let audio_in_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&audio_in),
+            usage: BufferUsages::STORAGE,
+        });
+
+        let audio_out_buffer = device.create_buffer(&BufferDescriptor {
+            label: None,
+            size: 512 * 4, // 512 samples * 4 bytes per sample
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+
+        let staging_buffer = device.create_buffer(&BufferDescriptor {
+            label: None,
+            size: 512 * 4,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
         let compute_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: None,
             layout: None,
@@ -132,6 +166,22 @@ impl Simulation {
             map_buffer,
             average_energy_buffer,
             size: args.size,
+
+            audio_in_buffer,
+            audio_out_buffer,
+            staging_buffer,
+            audio_writer: Some(
+                WavWriter::create(
+                    "configs/reverb/output.wav",
+                    hound::WavSpec {
+                        channels: 1,
+                        sample_rate: 16_000,
+                        bits_per_sample: 32,
+                        sample_format: hound::SampleFormat::Float,
+                    },
+                )
+                .unwrap(),
+            ),
 
             ticks_per_dispatch: 1,
             tick: 0,
@@ -196,6 +246,14 @@ impl Simulation {
                         binding: 3,
                         resource: self.average_energy_buffer.as_entire_binding(),
                     },
+                    BindGroupEntry {
+                        binding: 4,
+                        resource: self.audio_in_buffer.as_entire_binding(),
+                    },
+                    BindGroupEntry {
+                        binding: 5,
+                        resource: self.audio_out_buffer.as_entire_binding(),
+                    },
                 ],
             });
 
@@ -206,6 +264,41 @@ impl Simulation {
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
             compute_pass.dispatch_workgroups(self.size.0.div_ceil(8), self.size.1.div_ceil(8), 1);
+            drop(compute_pass);
+
+            if let Some(writer) = &mut self.audio_writer {
+                if self.tick > 0 && self.tick % 512 == 0 {
+                    encoder.copy_buffer_to_buffer(
+                        &self.audio_out_buffer,
+                        0,
+                        &self.staging_buffer,
+                        0,
+                        512 * 4,
+                    );
+
+                    let slice = self.staging_buffer.slice(..);
+                    let (tx, rx) = crossbeam_channel::bounded(1);
+                    slice.map_async(MapMode::Read, move |_| tx.send(()).unwrap());
+
+                    gc.device.poll(Maintain::Wait);
+
+                    rx.recv().unwrap();
+                    let mapped = slice.get_mapped_range();
+                    let data = bytemuck::cast_slice::<_, f32>(&mapped);
+                    for sample in data {
+                        writer
+                            .write_sample((1.0 - (-sample.abs()).exp()).copysign(*sample))
+                            .unwrap();
+                    }
+                    drop(mapped);
+                    self.staging_buffer.unmap();
+                }
+            }
+
+            if self.tick == 160_000 {
+                self.audio_writer.take().unwrap().finalize().unwrap();
+                ::std::process::exit(0);
+            }
         }
     }
 
