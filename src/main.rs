@@ -177,7 +177,7 @@ impl<'a> App<'a> {
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         self.simulation
-            .update(&gc.device, &mut encoder, &context_buffer);
+            .update(&gc, &mut encoder, gc.window.inner_size());
 
         let output = gc.surface.get_current_texture().unwrap();
         let view = output

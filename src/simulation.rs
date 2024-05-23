@@ -12,7 +12,7 @@ use wgpu::{
 };
 use winit::dpi::PhysicalSize;
 
-use crate::args::Args;
+use crate::{args::Args, GraphicsContext};
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
@@ -160,50 +160,54 @@ impl Simulation {
 
     pub fn update(
         &mut self,
-        device: &Device,
+        gc: &GraphicsContext,
         encoder: &mut CommandEncoder,
-        context_buffer: &Buffer,
+        window_size: PhysicalSize<u32>,
     ) {
         if !self.running {
             return;
         }
 
-        self.tick += self.ticks_per_dispatch as u64;
+        for _ in 0..self.ticks_per_dispatch {
+            self.tick += 1;
 
-        let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
-        let mut entries = vec![
-            BindGroupEntry {
-                binding: 0,
-                resource: context_buffer.as_entire_binding(),
-            },
-            BindGroupEntry {
-                binding: 2,
-                resource: self.states.as_entire_binding(),
-            },
-            BindGroupEntry {
-                binding: 3,
-                resource: self.average_energy_buffer.as_entire_binding(),
-            },
-        ];
-        if let Some(ref map) = self.map_buffer {
-            entries.push(BindGroupEntry {
-                binding: 1,
-                resource: map.as_entire_binding(),
+            let buf = self.get_context_buffer(&gc.device, window_size);
+
+            let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
+            let mut entries = vec![
+                BindGroupEntry {
+                    binding: 0,
+                    resource: buf.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: self.states.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: self.average_energy_buffer.as_entire_binding(),
+                },
+            ];
+            if let Some(ref map) = self.map_buffer {
+                entries.push(BindGroupEntry {
+                    binding: 1,
+                    resource: map.as_entire_binding(),
+                });
+            }
+            let bind_group = gc.device.create_bind_group(&BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &entries,
             });
-        }
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &entries,
-        });
 
-        let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
-            label: None,
-            timestamp_writes: None,
-        });
-        compute_pass.set_pipeline(&self.compute_pipeline);
-        compute_pass.set_bind_group(0, &bind_group, &[]);
-        compute_pass.dispatch_workgroups(self.size.0.div_ceil(8), self.size.1.div_ceil(8), 1);
+            let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: None,
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &bind_group, &[]);
+            compute_pass.dispatch_workgroups(self.size.0.div_ceil(8), self.size.1.div_ceil(8), 1);
+        }
     }
 
     pub fn get_context_buffer(&self, device: &Device, window_size: PhysicalSize<u32>) -> Buffer {

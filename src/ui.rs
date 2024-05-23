@@ -71,7 +71,7 @@ impl Gui {
                 }
 
                 ui.add(
-                    Slider::new(&mut simulation.ticks_per_dispatch, 1..=128)
+                    Slider::new(&mut simulation.ticks_per_dispatch, 1..=32)
                         .text("Ticks per Dispatch"),
                 );
 
