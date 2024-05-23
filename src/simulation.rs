@@ -29,6 +29,7 @@ pub struct Simulation {
 
     audio_in_buffer: Buffer,
     audio_out_buffer: Buffer,
+    audio_in_length: usize,
     staging_buffer: Buffer,
     audio_writer: Option<WavWriter<BufWriter<File>>>,
 
@@ -128,6 +129,7 @@ impl Simulation {
         let audio_in = hound::WavReader::open("configs/reverb/input.wav")?
             .samples::<f32>()
             .collect::<Result<Vec<_>, hound::Error>>()?;
+        let audio_in_length = audio_in.len();
         let audio_in_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&audio_in),
@@ -169,6 +171,7 @@ impl Simulation {
 
             audio_in_buffer,
             audio_out_buffer,
+            audio_in_length,
             staging_buffer,
             audio_writer: Some(
                 WavWriter::create(
@@ -285,7 +288,7 @@ impl Simulation {
                     rx.recv().unwrap();
                     let mapped = slice.get_mapped_range();
                     let data = bytemuck::cast_slice::<_, f32>(&mapped);
-                    for sample in data {
+                    for sample in data.iter().skip(1) {
                         writer
                             .write_sample((1.0 - (-sample.abs()).exp()).copysign(*sample))
                             .unwrap();
@@ -295,7 +298,7 @@ impl Simulation {
                 }
             }
 
-            if self.tick == 160_000 {
+            if self.tick == self.audio_in_length as u64 {
                 self.audio_writer.take().unwrap().finalize().unwrap();
                 ::std::process::exit(0);
             }
