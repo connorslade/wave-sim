@@ -223,8 +223,6 @@ impl Simulation {
         }
 
         for _ in 0..self.ticks_per_dispatch {
-            self.tick += 1;
-
             let buf = self.get_context_buffer(&gc.device, window_size);
 
             let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
@@ -288,7 +286,7 @@ impl Simulation {
                     rx.recv().unwrap();
                     let mapped = slice.get_mapped_range();
                     let data = bytemuck::cast_slice::<_, f32>(&mapped);
-                    for sample in data.iter().skip(1) {
+                    for sample in data {
                         writer
                             .write_sample((1.0 - (-sample.abs()).exp()).copysign(*sample))
                             .unwrap();
@@ -302,6 +300,8 @@ impl Simulation {
                 self.audio_writer.take().unwrap().finalize().unwrap();
                 ::std::process::exit(0);
             }
+
+            self.tick += 1;
         }
     }
 
