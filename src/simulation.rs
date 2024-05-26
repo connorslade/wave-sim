@@ -12,7 +12,7 @@ use wgpu::{
 };
 use winit::dpi::PhysicalSize;
 
-use crate::{args::Args, GraphicsContext};
+use crate::{args::Config, GraphicsContext};
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
@@ -59,7 +59,7 @@ pub struct ShaderContext {
 }
 
 impl Simulation {
-    pub fn new(device: &Device, args: &Args) -> Result<Self> {
+    pub fn new(device: &Device, args: &Config) -> Result<Self> {
         let map = args
             .map
             .as_ref()
