@@ -90,6 +90,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     states[ni] += ctx.amplitude * distance * cos(f32(ctx.tick) * ctx.oscillation);
 
+    // damping
+    states[ni] *= 0.99999;
+
     if y == 540 && x == 250 {
         audio_out[ctx.tick % 512] = states[ni];
     }

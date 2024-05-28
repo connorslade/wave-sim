@@ -268,7 +268,7 @@ impl Simulation {
             drop(compute_pass);
 
             if let Some(writer) = &mut self.audio_writer {
-                if self.tick > 0 && self.tick % 512 == 0 {
+                if self.tick > 0 && self.tick % 512 == 511 {
                     encoder.copy_buffer_to_buffer(
                         &self.audio_out_buffer,
                         0,
