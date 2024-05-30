@@ -49,7 +49,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let map_value = get_map(x, y);
 
     let wall = f32(map_value.r == 0);
-    let distance = f32(map_value.g) / 255.0;
+    // let distance = f32(map_value.g) / 255.0;
     let c = pow(ctx.c * (f32(map_value.b) / 255.0 * 2.0), 2.0);
 
     let next = tick % 3;
@@ -88,17 +88,23 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             - 4.0 * states[index(x, y, current)]
         ) * wall;
 
-    states[ni] += ctx.amplitude * distance * cos(f32(ctx.tick) * ctx.oscillation);
+
+    // cos(f32(ctx.tick) * (6.2832 / 20000))
+    let emitter = vec2<f32>(
+        f32(ctx.width)  / 2.0 + 700.0 * (f32(ctx.tick) / 32000f - 0.5),
+        f32(ctx.height) / 2.0
+    );
+    let distance = distance(vec2<f32>(f32(x), f32(y)), emitter);
+    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
 
     // damping
     states[ni] *= 0.99999;
 
-    if y == 540 && x == 250 {
+    if y == 540 && x == 960 {
         audio_out[ctx.tick % 512] = states[ni];
     }
 
-    let dst = distance(vec2<f32>(f32(x), f32(y)), vec2<f32>(f32(ctx.width) / 2.0, f32(ctx.height) / 2.0));
-    states[ni] += exp(-abs(dst)) * audio_in[ctx.tick];
+    // states[ni] += exp(-abs(dst)) * audio_in[ctx.tick];
 
     tick(x, y);
 
