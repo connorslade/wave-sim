@@ -91,6 +91,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             - 4.0 * states[index(x, y, current)]
         ) * f32(wall);
 
+    // #if OSCILLATOR
+    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
+    // #endif
 
     // #if AUDIO
     if y == 540 && x == 960 {

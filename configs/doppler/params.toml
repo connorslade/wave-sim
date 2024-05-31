@@ -11,5 +11,5 @@ amplitude = 0.3
 frequency = 4.0 # in x100 Hz
 
 [audio]
-input = "../reverb/input.wav"
-output = "audio.wav"
+input = "input.wav"
+output = "output.wav"

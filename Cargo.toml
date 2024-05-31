@@ -17,6 +17,7 @@ hound = "3.5.1"
 image = "0.25.1"
 num-traits = "0.2.19"
 pollster = { version = "0.3.0", features = ["macro"] }
+rubato = "0.15.0"
 serde = { version = "1.0.201", features = ["derive"] }
 soon = { git = "https://github.com/connorslade/misc" }
 spin_sleep_util = "0.1.1"

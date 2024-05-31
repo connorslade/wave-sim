@@ -110,6 +110,7 @@ impl Simulation {
         }
         let raw_shader = Preprocessor::new()
             .define_cond("AUDIO", audio.is_some())
+            .define_cond("OSCILLATOR", false)
             .process(&raw_shader);
 
         let compute_shader = device.create_shader_module(ShaderModuleDescriptor {
