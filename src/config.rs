@@ -33,6 +33,15 @@ pub struct Config {
     pub amplitude: f32,
     /// Initial oscillator frequency in Hz.
     pub frequency: f32,
+
+    /// Audio configuration.
+    pub audio: Option<AudioConfig>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct AudioConfig {
+    pub input: PathBuf,
+    pub output: PathBuf,
 }
 
 #[derive(Parser)]

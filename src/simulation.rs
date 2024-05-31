@@ -4,7 +4,7 @@ use std::{
     fs::{self, File},
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Error, Result};
 use bitflags::bitflags;
 use encase::ShaderType;
 use image::{io::Reader, DynamicImage, GenericImage};
@@ -87,11 +87,17 @@ impl Simulation {
             })
             .transpose()?;
 
-        let audio = Some(Audio::new(
-            device,
-            File::open("configs/reverb/input.wav")?,
-            File::create("configs/reverb/output-2.wav")?,
-        )?);
+        let audio = args
+            .audio
+            .as_ref()
+            .map(|x| {
+                Result::<_, Error>::Ok(Audio::new(
+                    device,
+                    File::open(args.base_path().join(&x.input))?,
+                    File::create(args.base_path().join(&x.output))?,
+                )?)
+            })
+            .transpose()?;
 
         let mut raw_shader = Cow::Borrowed(include_str!("shaders/shader.wgsl"));
         if let Some(ref shader) = args.shader {
