@@ -2,6 +2,9 @@ use std::{fs::File, io::Read};
 
 use anyhow::{Ok, Result};
 use hound::{SampleFormat, WavReader, WavWriter};
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferDescriptor, BufferUsages, CommandEncoder, Device, Maintain, MapMode,
@@ -31,7 +34,6 @@ impl Audio {
                 .samples::<f32>()
                 .collect::<Result<Vec<_>, hound::Error>>(),
             SampleFormat::Int => {
-                //todo: test
                 let denominator = (1u32 << audio_in_spec.bits_per_sample - 1) as f32;
                 audio_in_reader
                     .samples::<i32>()
@@ -40,21 +42,21 @@ impl Audio {
             }
         }?;
 
-        // let params = SincInterpolationParameters {
-        //     sinc_len: 256,
-        //     f_cutoff: 0.95,
-        //     interpolation: SincInterpolationType::Linear,
-        //     oversampling_factor: 256,
-        //     window: WindowFunction::BlackmanHarris2,
-        // };
-        // let mut resampler = SincFixedIn::<f32>::new(
-        //     SAMPLE_RATE as f64 / audio_in_spec.sample_rate as f64,
-        //     2.0,
-        //     params,
-        //     1024,
-        //     1,
-        // )?;
-        // let audio_in = &resampler.process(&[&audio_in], None)?[0];
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        let mut resampler = SincFixedIn::<f32>::new(
+            SAMPLE_RATE as f64 / audio_in_spec.sample_rate as f64,
+            2.0,
+            params,
+            1024,
+            1,
+        )?;
+        let audio_in = &resampler.process(&[&audio_in], None)?[0];
 
         let audio_writer = WavWriter::new(
             wav_out,
