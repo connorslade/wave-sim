@@ -250,7 +250,7 @@ impl Simulation {
             drop(compute_pass);
 
             if let Some(audio) = &mut self.audio {
-                if 32000 == self.tick as usize {
+                if audio.audio_in_len == self.tick as usize {
                     self.running = false;
                 } else if audio.audio_in_len > self.tick as usize {
                     audio.tick(self.tick, gc, encoder);
