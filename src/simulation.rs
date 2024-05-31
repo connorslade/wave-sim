@@ -4,7 +4,7 @@ use std::{
     fs::{self, File},
 };
 
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use bitflags::bitflags;
 use encase::ShaderType;
 use image::{io::Reader, DynamicImage, GenericImage};
@@ -91,11 +91,11 @@ impl Simulation {
             .audio
             .as_ref()
             .map(|x| {
-                Result::<_, Error>::Ok(Audio::new(
+                Audio::new(
                     device,
                     File::open(args.base_path().join(&x.input))?,
                     File::create(args.base_path().join(&x.output))?,
-                )?)
+                )
             })
             .transpose()?;
 
@@ -110,8 +110,7 @@ impl Simulation {
         }
         let raw_shader = Preprocessor::new()
             .define_cond("AUDIO", audio.is_some())
-            .process(&raw_shader)
-            .into();
+            .process(&raw_shader);
 
         let compute_shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
