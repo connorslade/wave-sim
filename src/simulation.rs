@@ -17,7 +17,7 @@ use wgpu::{
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    args::Args,
+    args::Config,
     misc::{audio::Audio, preprocess::Preprocessor},
     GraphicsContext,
 };
@@ -71,7 +71,7 @@ pub struct ShaderContext {
 }
 
 impl Simulation {
-    pub fn new(device: &Device, args: &Args) -> Result<Self> {
+    pub fn new(device: &Device, args: &Config) -> Result<Self> {
         let map = args
             .map
             .as_ref()
