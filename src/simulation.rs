@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    cmp::Ordering,
     f32::consts::PI,
     fs::{self, File},
 };
@@ -251,10 +252,10 @@ impl Simulation {
             drop(compute_pass);
 
             if let Some(audio) = &mut self.audio {
-                if audio.audio_in_len == self.tick as usize {
-                    self.running = false;
-                } else if audio.audio_in_len > self.tick as usize {
-                    audio.tick(self.tick, gc, encoder);
+                match audio.audio_in_len.cmp(&(self.tick as usize)) {
+                    Ordering::Equal => self.running = false,
+                    Ordering::Greater => audio.tick(self.tick, gc, encoder),
+                    _ => {}
                 }
             }
 

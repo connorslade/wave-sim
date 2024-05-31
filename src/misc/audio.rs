@@ -34,7 +34,7 @@ impl Audio {
                 .samples::<f32>()
                 .collect::<Result<Vec<_>, hound::Error>>(),
             SampleFormat::Int => {
-                let denominator = (1u32 << audio_in_spec.bits_per_sample - 1) as f32;
+                let denominator = (1u32 << (audio_in_spec.bits_per_sample - 1)) as f32;
                 audio_in_reader
                     .samples::<i32>()
                     .map(|x| x.map(|x| x as f32 / denominator))
@@ -71,7 +71,7 @@ impl Audio {
 
         let audio_in_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&audio_in),
+            contents: bytemuck::cast_slice(audio_in),
             usage: BufferUsages::STORAGE,
         });
 
