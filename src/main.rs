@@ -21,7 +21,7 @@ use winit::{
     window::{Icon, Window, WindowBuilder},
 };
 
-mod args;
+mod config;
 mod egui;
 mod misc;
 mod renderer;
@@ -62,7 +62,7 @@ struct FpsTracker {
 
 #[pollster::main]
 async fn main() -> Result<()> {
-    let args = args::parse()?;
+    let args = config::parse()?;
 
     let instance = Instance::default();
 

@@ -17,7 +17,7 @@ use wgpu::{
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    args::Config,
+    config::Config,
     misc::{audio::Audio, preprocess::Preprocessor},
     GraphicsContext,
 };
