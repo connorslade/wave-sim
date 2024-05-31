@@ -10,13 +10,19 @@ use encase::ShaderType;
 use image::{io::Reader, DynamicImage, GenericImage};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
-    CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
-    Maintain, MapMode, Queue, ShaderModuleDescriptor, ShaderSource,
+    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferUsages, CommandEncoder,
+    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, Queue,
+    ShaderModuleDescriptor, ShaderSource,
 };
 use winit::dpi::PhysicalSize;
 
-use crate::{args::Args, misc::audio::Audio, GraphicsContext};
+use crate::{
+    args::Args,
+    misc::{audio::Audio, preprocess::Preprocessor},
+    GraphicsContext,
+};
+
+const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, wall: ptr<function, bool>, distance: ptr<function, f32>, c: ptr<function, f32>)";
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
@@ -25,7 +31,7 @@ pub struct Simulation {
     average_energy_buffer: Buffer,
     size: (u32, u32),
 
-    audio: Audio,
+    audio: Option<Audio>,
 
     pub ticks_per_dispatch: u32,
     pub tick: u64,
@@ -81,17 +87,25 @@ impl Simulation {
             })
             .transpose()?;
 
-        let audio = Audio::new(device, File::open("input.wav")?, File::open("output.wav")?)?;
+        let audio = Some(Audio::new(
+            device,
+            File::open("configs/reverb/input.wav")?,
+            File::create("configs/reverb/output-2.wav")?,
+        )?);
 
         let mut raw_shader = Cow::Borrowed(include_str!("shaders/shader.wgsl"));
         if let Some(ref shader) = args.shader {
             let shader = fs::read_to_string(args.base_path().join(shader)).unwrap();
             let line_end = raw_shader.find('\n').unwrap();
             raw_shader = Cow::Owned(format!(
-                "fn tick(x: u32, y: u32) {{\n{shader}\n}}{}",
+                "{TICK_SIGNATURE} {{\n{shader}\n}}{}",
                 &raw_shader[line_end..]
             ));
         }
+        let raw_shader = Preprocessor::new()
+            .define_cond("AUDIO", audio.is_some())
+            .process(&raw_shader)
+            .into();
 
         let compute_shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
@@ -121,13 +135,6 @@ impl Simulation {
         };
         let state_buffer = device.create_buffer_init(&state_buffer_descriptor.clone());
         let average_energy_buffer = device.create_buffer_init(&state_buffer_descriptor);
-
-        let staging_buffer = device.create_buffer(&BufferDescriptor {
-            label: None,
-            size: 512 * 4,
-            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
 
         let compute_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: None,
@@ -190,36 +197,42 @@ impl Simulation {
             let buf = self.get_context_buffer(&gc.device, window_size);
 
             let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
+            let mut entries = vec![
+                BindGroupEntry {
+                    binding: 0,
+                    resource: buf.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: self.map_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: self.states.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: self.average_energy_buffer.as_entire_binding(),
+                },
+            ];
+
+            if let Some(audio) = &self.audio {
+                entries.extend([
+                    BindGroupEntry {
+                        binding: 4,
+                        resource: audio.audio_in_buffer.as_entire_binding(),
+                    },
+                    BindGroupEntry {
+                        binding: 5,
+                        resource: audio.audio_out_buffer.as_entire_binding(),
+                    },
+                ]);
+            }
 
             let bind_group = gc.device.create_bind_group(&BindGroupDescriptor {
                 label: None,
                 layout: &bind_group_layout,
-                entries: &[
-                    BindGroupEntry {
-                        binding: 0,
-                        resource: buf.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 1,
-                        resource: self.map_buffer.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 2,
-                        resource: self.states.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 3,
-                        resource: self.average_energy_buffer.as_entire_binding(),
-                    },
-                    // BindGroupEntry {
-                    //     binding: 4,
-                    //     resource: self.audio_in_buffer.as_entire_binding(),
-                    // },
-                    // BindGroupEntry {
-                    //     binding: 5,
-                    //     resource: self.audio_out_buffer.as_entire_binding(),
-                    // },
-                ],
+                entries: &entries,
             });
 
             let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
@@ -231,39 +244,13 @@ impl Simulation {
             compute_pass.dispatch_workgroups(self.size.0.div_ceil(8), self.size.1.div_ceil(8), 1);
             drop(compute_pass);
 
-            // if let Some(writer) = &mut self.audio_writer {
-            //     if self.tick > 0 && self.tick % 512 == 511 {
-            //         encoder.copy_buffer_to_buffer(
-            //             &self.audio_out_buffer,
-            //             0,
-            //             &self.staging_buffer,
-            //             0,
-            //             512 * 4,
-            //         );
-
-            //         let slice = self.staging_buffer.slice(..);
-            //         let (tx, rx) = crossbeam_channel::bounded(1);
-            //         slice.map_async(MapMode::Read, move |_| tx.send(()).unwrap());
-
-            //         gc.device.poll(Maintain::Wait);
-
-            //         rx.recv().unwrap();
-            //         let mapped = slice.get_mapped_range();
-            //         let data = bytemuck::cast_slice::<_, f32>(&mapped);
-            //         for sample in data {
-            //             writer
-            //                 .write_sample((1.0 - (-sample.abs()).exp()).copysign(*sample))
-            //                 .unwrap();
-            //         }
-            //         drop(mapped);
-            //         self.staging_buffer.unmap();
-            //     }
-            // }
-
-            // if self.tick == 32_000 as u64 {
-            //     self.audio_writer.take().unwrap().finalize().unwrap();
-            //     ::std::process::exit(0);
-            // }
+            if let Some(audio) = &mut self.audio {
+                if 32000 == self.tick as usize {
+                    self.running = false;
+                } else if audio.audio_in_len > self.tick as usize {
+                    audio.tick(self.tick, gc, encoder);
+                }
+            }
 
             self.tick += 1;
         }

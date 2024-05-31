@@ -1,4 +1,3 @@
-use std::io::{Seek, Write};
 use std::{fs::File, io::Read};
 
 use anyhow::{Ok, Result};
@@ -7,20 +6,21 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferDescriptor, BufferUsages, Device,
 };
+use wgpu::{CommandEncoder, Maintain, MapMode};
 
 use crate::GraphicsContext;
 
 const OUTPUT_BUFFER_SIZE: usize = 512;
 const SAMPLE_RATE: u32 = 16_000;
 
-trait WriteSeek: Write + Seek {}
-
 pub struct Audio {
-    audio_in_buffer: Buffer,
-    audio_out_buffer: Buffer,
-    audio_in_length: usize,
-    staging_buffer: Buffer,
+    pub audio_in_buffer: Buffer,
+    pub audio_in_len: usize,
+
+    pub audio_out_buffer: Buffer,
     audio_writer: WavWriter<File>,
+
+    staging_buffer: Buffer,
 }
 
 impl Audio {
@@ -46,30 +46,58 @@ impl Audio {
             usage: BufferUsages::STORAGE,
         });
 
+        let buf_size = OUTPUT_BUFFER_SIZE as u64 * 4;
         let audio_out_buffer = device.create_buffer(&BufferDescriptor {
             label: None,
-            size: 512 * 4, // 512 samples * 4 bytes per sample
+            size: buf_size,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
 
         let staging_buffer = device.create_buffer(&BufferDescriptor {
             label: None,
-            size: 512 * 4,
+            size: buf_size,
             usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
 
         Ok(Self {
             audio_in_buffer,
+            audio_in_len: audio_in.len(),
+
             audio_out_buffer,
-            audio_in_length: audio_in.len(),
-            staging_buffer,
             audio_writer,
+
+            staging_buffer,
         })
     }
 
-    pub fn tick(&mut self, tick: usize, gc: &GraphicsContext) {
-        if tick > 0 && tick % OUTPUT_BUFFER_SIZE == OUTPUT_BUFFER_SIZE - 1 {}
+    pub fn tick(&mut self, tick: u64, gc: &GraphicsContext, encoder: &mut CommandEncoder) {
+        if tick > 0 && tick as usize % OUTPUT_BUFFER_SIZE == OUTPUT_BUFFER_SIZE - 1 {
+            encoder.copy_buffer_to_buffer(
+                &self.audio_out_buffer,
+                0,
+                &self.staging_buffer,
+                0,
+                512 * 4,
+            );
+
+            let slice = self.staging_buffer.slice(..);
+            let (tx, rx) = crossbeam_channel::bounded(1);
+            slice.map_async(MapMode::Read, move |_| tx.send(()).unwrap());
+
+            gc.device.poll(Maintain::Wait);
+
+            rx.recv().unwrap();
+            let mapped = slice.get_mapped_range();
+            let data = bytemuck::cast_slice::<_, f32>(&mapped);
+            for sample in data {
+                self.audio_writer
+                    .write_sample((1.0 - (-sample.abs()).exp()).copysign(*sample))
+                    .unwrap();
+            }
+            drop(mapped);
+            self.staging_buffer.unmap();
+        }
     }
 }

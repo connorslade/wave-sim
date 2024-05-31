@@ -1,4 +1,4 @@
-fn tick(x: u32, y: u32) {} // Populated at runtime
+fn tick(x: u32, y: u32, wall: ptr<function, bool>, distance: ptr<function, f32>, c: ptr<function, f32>) {} // Populated at runtime
 
 @group(0) @binding(0) var<uniform> ctx: Context;
 @group(0) @binding(1) var<storage> map: array<u32>;
@@ -6,8 +6,10 @@ fn tick(x: u32, y: u32) {} // Populated at runtime
 @group(0) @binding(2) var<storage, read_write> states: array<f32>;
 @group(0) @binding(3) var<storage, read_write> average_energy: array<f32>;
 
+// #if AUDIO
 @group(0) @binding(4) var<storage, read> audio_in: array<f32>;
 @group(0) @binding(5) var<storage, read_write> audio_out: array<f32>;
+// #endif
 
 struct Context {
     width: u32,
@@ -48,9 +50,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let y = global_id.y;
     let map_value = get_map(x, y);
 
-    let wall = f32(map_value.r == 0);
-    // let distance = f32(map_value.g) / 255.0;
-    let c = pow(ctx.c * (f32(map_value.b) / 255.0 * 2.0), 2.0);
+    var wall = map_value.r == 0;
+    var distance = f32(map_value.g) / 255.0;
+    var c = pow(ctx.c * (f32(map_value.b) / 255.0 * 2.0), 2.0);
+    tick(x, y, &wall, &distance, &c);
 
     let next = tick % 3;
     let current = (tick + 2) % 3;
@@ -86,27 +89,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             + states[index(x, y - 1, current)]
             + states[index(x, y + 1, current)]
             - 4.0 * states[index(x, y, current)]
-        ) * wall;
+        ) * f32(wall);
 
 
-    // cos(f32(ctx.tick) * (6.2832 / 20000))
-    let emitter = vec2<f32>(
-        f32(ctx.width)  / 2.0 + 700.0 * (f32(ctx.tick) / 32000f - 0.5),
-        f32(ctx.height) / 2.0
-    );
-    let distance = distance(vec2<f32>(f32(x), f32(y)), emitter);
-    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
-
-    // damping
-    states[ni] *= 0.99999;
-
+    // #if AUDIO
     if y == 540 && x == 960 {
         audio_out[ctx.tick % 512] = states[ni];
     }
 
-    // states[ni] += exp(-abs(dst)) * audio_in[ctx.tick];
-
-    tick(x, y);
+    states[ni] += exp(-abs(distance)) * audio_in[ctx.tick];
+    // #endif
 
     let nd = f32(tick) + 1.0;
     average_energy[index(x, y, 0u)] *= (f32(tick) / nd) + pow(states[ni], 2.0) / nd; 
