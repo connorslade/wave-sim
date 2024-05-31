@@ -1,4 +1,8 @@
-use std::{borrow::Cow, f32::consts::PI, fs};
+use std::{
+    borrow::Cow,
+    f32::consts::PI,
+    fs::{self, File},
+};
 
 use anyhow::{Context, Result};
 use bitflags::bitflags;
@@ -12,7 +16,13 @@ use wgpu::{
 };
 use winit::dpi::PhysicalSize;
 
-use crate::{args::Config, GraphicsContext};
+use crate::{
+    args::Config,
+    misc::{audio::Audio, preprocess::Preprocessor},
+    GraphicsContext,
+};
+
+const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, wall: ptr<function, bool>, distance: ptr<function, f32>, c: ptr<function, f32>)";
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
@@ -20,6 +30,8 @@ pub struct Simulation {
     map_buffer: Buffer,
     average_energy_buffer: Buffer,
     size: (u32, u32),
+
+    audio: Option<Audio>,
 
     pub ticks_per_dispatch: u32,
     pub tick: u64,
@@ -75,15 +87,25 @@ impl Simulation {
             })
             .transpose()?;
 
+        let audio = Some(Audio::new(
+            device,
+            File::open("configs/reverb/input.wav")?,
+            File::create("configs/reverb/output-2.wav")?,
+        )?);
+
         let mut raw_shader = Cow::Borrowed(include_str!("shaders/shader.wgsl"));
         if let Some(ref shader) = args.shader {
             let shader = fs::read_to_string(args.base_path().join(shader)).unwrap();
             let line_end = raw_shader.find('\n').unwrap();
             raw_shader = Cow::Owned(format!(
-                "fn tick(x: u32, y: u32) {{\n{shader}\n}}{}",
+                "{TICK_SIGNATURE} {{\n{shader}\n}}{}",
                 &raw_shader[line_end..]
             ));
         }
+        let raw_shader = Preprocessor::new()
+            .define_cond("AUDIO", audio.is_some())
+            .process(&raw_shader)
+            .into();
 
         let compute_shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
@@ -133,6 +155,8 @@ impl Simulation {
             average_energy_buffer,
             size: args.size,
 
+            audio,
+
             ticks_per_dispatch: 1,
             tick: 0,
             running: false,
@@ -170,33 +194,45 @@ impl Simulation {
         }
 
         for _ in 0..self.ticks_per_dispatch {
-            self.tick += 1;
-
             let buf = self.get_context_buffer(&gc.device, window_size);
 
             let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
+            let mut entries = vec![
+                BindGroupEntry {
+                    binding: 0,
+                    resource: buf.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: self.map_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: self.states.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: self.average_energy_buffer.as_entire_binding(),
+                },
+            ];
+
+            if let Some(audio) = &self.audio {
+                entries.extend([
+                    BindGroupEntry {
+                        binding: 4,
+                        resource: audio.audio_in_buffer.as_entire_binding(),
+                    },
+                    BindGroupEntry {
+                        binding: 5,
+                        resource: audio.audio_out_buffer.as_entire_binding(),
+                    },
+                ]);
+            }
 
             let bind_group = gc.device.create_bind_group(&BindGroupDescriptor {
                 label: None,
                 layout: &bind_group_layout,
-                entries: &[
-                    BindGroupEntry {
-                        binding: 0,
-                        resource: buf.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 1,
-                        resource: self.map_buffer.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 2,
-                        resource: self.states.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 3,
-                        resource: self.average_energy_buffer.as_entire_binding(),
-                    },
-                ],
+                entries: &entries,
             });
 
             let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
@@ -206,6 +242,17 @@ impl Simulation {
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
             compute_pass.dispatch_workgroups(self.size.0.div_ceil(8), self.size.1.div_ceil(8), 1);
+            drop(compute_pass);
+
+            if let Some(audio) = &mut self.audio {
+                if 32000 == self.tick as usize {
+                    self.running = false;
+                } else if audio.audio_in_len > self.tick as usize {
+                    audio.tick(self.tick, gc, encoder);
+                }
+            }
+
+            self.tick += 1;
         }
     }
 

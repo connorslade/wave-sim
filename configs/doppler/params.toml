@@ -1,0 +1,11 @@
+size = [1920, 1080]
+reflective_boundary = false
+
+shader = "shader.wgsl"
+
+dx = 0.0810
+dt = 0.0625
+
+v = 340.29
+amplitude = 0.3
+frequency = 4.0  # in x100 Hz
