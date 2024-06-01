@@ -3,7 +3,7 @@
 A GPU accelerated simulator for the discretized wave equation.
 Check out the [configs](configs) directory for some demos and information on how to run the simulator yourself.
 
-![Screenshot](https://github.com/connorslade/wave-sim/assets/50306817/b10e23fa-1be6-4760-873d-a2dbc7531dba)
+![Screenshot](https://github.com/connorslade/wave-sim/assets/50306817/889be748-7122-43b0-9fe0-bd533a81231b)
 
 ## References
 
