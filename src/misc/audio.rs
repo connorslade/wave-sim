@@ -29,7 +29,7 @@ impl Audio {
     pub fn new(device: &Device, wav_in: impl Read, wav_out: File) -> Result<Self> {
         let mut audio_in_reader = WavReader::new(wav_in)?;
         let audio_in_spec = audio_in_reader.spec();
-        let audio_in = match audio_in_spec.sample_format {
+        let mut audio_in = match audio_in_spec.sample_format {
             SampleFormat::Float => audio_in_reader
                 .samples::<f32>()
                 .collect::<Result<Vec<_>, hound::Error>>(),
@@ -42,21 +42,23 @@ impl Audio {
             }
         }?;
 
-        let params = SincInterpolationParameters {
-            sinc_len: 256,
-            f_cutoff: 0.95,
-            interpolation: SincInterpolationType::Linear,
-            oversampling_factor: 256,
-            window: WindowFunction::BlackmanHarris2,
-        };
-        let mut resampler = SincFixedIn::<f32>::new(
-            SAMPLE_RATE as f64 / audio_in_spec.sample_rate as f64,
-            2.0,
-            params,
-            1024,
-            1,
-        )?;
-        let audio_in = &resampler.process(&[&audio_in], None)?[0];
+        if audio_in_spec.sample_rate != SAMPLE_RATE {
+            let params = SincInterpolationParameters {
+                sinc_len: 256,
+                f_cutoff: 0.95,
+                interpolation: SincInterpolationType::Linear,
+                oversampling_factor: 256,
+                window: WindowFunction::BlackmanHarris2,
+            };
+            let mut resampler = SincFixedIn::<f32>::new(
+                SAMPLE_RATE as f64 / audio_in_spec.sample_rate as f64,
+                2.0,
+                params,
+                audio_in.len(),
+                1,
+            )?;
+            audio_in = resampler.process(&[&audio_in], None)?.remove(0);
+        }
 
         let audio_writer = WavWriter::new(
             wav_out,
@@ -71,7 +73,7 @@ impl Audio {
 
         let audio_in_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(audio_in),
+            contents: bytemuck::cast_slice(&audio_in),
             usage: BufferUsages::STORAGE,
         });
 

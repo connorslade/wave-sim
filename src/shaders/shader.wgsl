@@ -1,4 +1,4 @@
-fn tick(x: u32, y: u32, wall: ptr<function, bool>, distance: ptr<function, f32>, c: ptr<function, f32>) {} // Populated at runtime
+fn tick(x: u32, y: u32, mul: ptr<function, f32>, distance: ptr<function, f32>, c: ptr<function, f32>) {} // Populated at runtime
 
 @group(0) @binding(0) var<uniform> ctx: Context;
 @group(0) @binding(1) var<storage> map: array<u32>;
@@ -50,10 +50,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let y = global_id.y;
     let map_value = get_map(x, y);
 
-    var wall = map_value.r == 0;
+    var mul = f32(map_value.r == 0);
     var distance = f32(map_value.g) / 255.0;
     var c = pow(ctx.c * (f32(map_value.b) / 255.0 * 2.0), 2.0);
-    tick(x, y, &wall, &distance, &c);
+    tick(x, y, &mul, &distance, &c);
 
     let next = tick % 3;
     let current = (tick + 2) % 3;
@@ -89,18 +89,19 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             + states[index(x, y - 1, current)]
             + states[index(x, y + 1, current)]
             - 4.0 * states[index(x, y, current)]
-        ) * f32(wall);
+        );
+    states[ni] *= mul;
 
     // #if OSCILLATOR
     states[ni] += ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
     // #endif
 
     // #if AUDIO
-    if y == 540 && x == 960 {
+    if y == AUDIO.y && x == AUDIO.x {
         audio_out[ctx.tick % 512] = states[ni];
     }
 
-    states[ni] += exp(-abs(distance)) * audio_in[ctx.tick];
+    states[ni] += ctx.amplitude * exp(-abs(distance)) * audio_in[ctx.tick];
     // #endif
 
     let nd = f32(tick) + 1.0;

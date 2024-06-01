@@ -19,11 +19,14 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     config::Config,
-    misc::{audio::Audio, preprocess::Preprocessor},
+    misc::{
+        audio::Audio,
+        preprocess::{Data, Preprocessor},
+    },
     GraphicsContext,
 };
 
-const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, wall: ptr<function, bool>, distance: ptr<function, f32>, c: ptr<function, f32>)";
+const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, mul: ptr<function, f32>, distance: ptr<function, f32>, c: ptr<function, f32>)";
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
@@ -109,14 +112,18 @@ impl Simulation {
                 &raw_shader[line_end..]
             ));
         }
-        let raw_shader = Preprocessor::new()
-            .define_cond("AUDIO", audio.is_some())
-            .define_cond("OSCILLATOR", false)
-            .process(&raw_shader);
 
+        let mut preprocessor = Preprocessor::new();
+        if let Some(audio) = &args.audio {
+            preprocessor = preprocessor.define("AUDIO", Data::vec2(audio.pickup.0, audio.pickup.1));
+        } else {
+            preprocessor = preprocessor.define("OSCILLATOR", Data::Null);
+        }
+
+        let raw_shader = preprocessor.process(&raw_shader);
         let compute_shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
-            source: ShaderSource::Wgsl(raw_shader),
+            source: ShaderSource::Wgsl(raw_shader.into()),
         });
 
         let map_data = match map {

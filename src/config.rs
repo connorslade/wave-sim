@@ -42,6 +42,7 @@ pub struct Config {
 pub struct AudioConfig {
     pub input: PathBuf,
     pub output: PathBuf,
+    pub pickup: (u32, u32),
 }
 
 #[derive(Parser)]
