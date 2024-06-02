@@ -1,5 +1,5 @@
-let next = ctx.tick % 3;
-let i = index(x, y, n);
+let current = (ctx.tick + 2) % 3;
+let i = index(x, y, current);
 
 let n = 15;
 let spacing = 3.0;

@@ -51,7 +51,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let map_value = get_map(x, y);
 
     var mul = f32(map_value.r == 0);
-    var distance = f32(map_value.g) / 255.0;
+    var distance = 255.0 - f32(map_value.g);
     var c = pow(ctx.c * (f32(map_value.b) / 255.0 * 2.0), 2.0);
     tick(x, y, &mul, &distance, &c);
 

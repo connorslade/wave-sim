@@ -1,5 +1,5 @@
-let next = ctx.tick % 3;
-let i = index(x, y, n);
+let current = (ctx.tick + 2) % 3;
+let i = index(x, y, current);
 
 for (var j = -1.0; j < 2.0; j += 2.0) {
     let emitter = vec2<f32>(

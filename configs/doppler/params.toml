@@ -13,3 +13,4 @@ frequency = 4.0 # in x100 Hz
 [audio]
 input = "input.wav"
 output = "output.wav"
+pickup = [960, 540]

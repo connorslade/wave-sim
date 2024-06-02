@@ -11,7 +11,7 @@ let slit_y = ctx.height / 2;
 let slit = x == slit_x
     && !(y > slit_y - slit_height - slit_gap && y < slit_y - slit_gap)
     && !(y > slit_y + slit_gap && y < slit_y + slit_gap + slit_height);
-states[i] *= f32(!slit);
+*mul = f32(!slit);
 
 // Liniar emitter on left wall
-states[i] += ctx.amplitude * cos(f32(ctx.tick) * ctx.oscillation) * f32(x == 1);
+*distance = f32(x);

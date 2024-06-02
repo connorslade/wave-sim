@@ -12,6 +12,6 @@ frequency = 4.0 # in x100 Hz
 
 [audio]
 input = "../reverb/input.wav"
-output = "output-left.wav"
-pickup = [959, 540]           # left
-# pickup = [961, 540] # right
+output = "output-right.wav"
+# pickup = [959, 540] # left
+pickup = [961, 540] # right
