@@ -105,5 +105,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // #endif
 
     let nd = f32(tick) + 1.0;
-    average_energy[index(x, y, 0u)] *= (f32(tick) / nd) + pow(states[ni], 2.0) / nd; 
+    average_energy[index(x, y, 0u)] = average_energy[index(x, y, 0u)] * (f32(tick) / nd) + pow(states[ni], 2.0) / nd; 
 }
