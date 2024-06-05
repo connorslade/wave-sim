@@ -75,6 +75,10 @@ impl Gui {
                         .text("Ticks per Dispatch"),
                 );
 
+                dragger(ui, "Gain", &mut simulation.gain, |x| {
+                    x.clamp_range(0.0..=f32::MAX).speed(0.1)
+                });
+
                 bit_checkbox(
                     ui,
                     "Reflective Boundaries",

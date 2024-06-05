@@ -17,6 +17,7 @@ struct Context {
     c: f32,
     amplitude: f32,
     oscillation: f32,
+    gain: f32
 }
 
 // VERTEX SHADER //
@@ -69,7 +70,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     if (ctx.flags & 0x02) != 0 {
-        var val = clamp(average_energy[u32(y) * ctx.width + u32(x)], 0.0, 1.0);
+        var val = clamp(average_energy[u32(y) * ctx.width + u32(x)] * ctx.gain, 0.0, 1.0);
         let scheme_index = u32(val * 3.0);
         val = val * 3.0 - f32(scheme_index);
 
@@ -90,7 +91,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(color, 1.0);
     }
 
-    let val = states[index(u32(x), u32(y), ctx.tick % 3)];
+    let val = states[index(u32(x), u32(y), ctx.tick % 3)] * ctx.gain;
     let color = (
           vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0)
         + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0)

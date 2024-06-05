@@ -26,6 +26,7 @@ struct Context {
     c: f32,
     amplitude: f32,
     oscillation: f32,
+    gain: f32
 }
 
 fn index(x: u32, y: u32, n: u32) -> u32 {
@@ -105,5 +106,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // #endif
 
     let nd = f32(tick) + 1.0;
-    average_energy[index(x, y, 0u)] = average_energy[index(x, y, 0u)] * (f32(tick) / nd) + pow(states[ni], 2.0) / nd; 
+    average_energy[index(x, y, 0u)] = average_energy[index(x, y, 0u)] * (f32(tick) / nd) + pow(states[ni], 2.0) / nd;
 }
