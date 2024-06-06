@@ -17,7 +17,8 @@ struct Context {
     c: f32,
     amplitude: f32,
     oscillation: f32,
-    gain: f32
+    gain: f32,
+    energy_gain: f32
 }
 
 // VERTEX SHADER //
@@ -69,8 +70,19 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(1.0, 1.0, 1.0, 1.0);
     }
 
+    if x > i32(ctx.width) - 40 {
+        var sum = 0.0;
+        for (var xp = i32(ctx.width) - 40; xp < i32(ctx.width); xp++) {
+            sum += average_energy[u32(y) * ctx.width + u32(xp)] * ctx.energy_gain;
+        }
+        sum /= 40.0;
+
+        // let out = sum / 2.0 + 0.5;
+        return vec4<f32>(0, sum, 0, 1.0);
+    }
+
     if (ctx.flags & 0x02) != 0 {
-        var val = clamp(average_energy[u32(y) * ctx.width + u32(x)] * ctx.gain, 0.0, 1.0);
+        var val = clamp(average_energy[u32(y) * ctx.width + u32(x)] * ctx.energy_gain, 0.0, 1.0);
         let scheme_index = u32(val * 3.0);
         val = val * 3.0 - f32(scheme_index);
 

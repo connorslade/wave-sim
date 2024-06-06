@@ -75,8 +75,17 @@ impl Gui {
                         .text("Ticks per Dispatch"),
                 );
 
-                dragger(ui, "Gain", &mut simulation.gain, |x| {
-                    x.clamp_range(0.0..=f32::MAX).speed(0.1)
+                ui.columns(2, |ui| {
+                    dragger(&mut ui[0], "Gain", &mut simulation.gain, |x| {
+                        x.clamp_range(0.0..=f32::MAX).speed(0.1)
+                    });
+
+                    dragger(
+                        &mut ui[1],
+                        "Energy Gain",
+                        &mut simulation.energy_gain,
+                        |x| x.clamp_range(0.0..=f32::MAX).speed(0.1),
+                    );
                 });
 
                 bit_checkbox(

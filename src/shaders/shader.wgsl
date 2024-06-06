@@ -26,7 +26,8 @@ struct Context {
     c: f32,
     amplitude: f32,
     oscillation: f32,
-    gain: f32
+    gain: f32,
+    energy_gain: f32
 }
 
 fn index(x: u32, y: u32, n: u32) -> u32 {

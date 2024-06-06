@@ -49,6 +49,7 @@ pub struct Simulation {
     pub amplitude: f32,
     pub frequency: f32,
     pub gain: f32,
+    pub energy_gain: f32,
 }
 
 bitflags! {
@@ -74,6 +75,7 @@ pub struct ShaderContext {
     amplitude: f32,
     frequency: f32,
     gain: f32,
+    energy_gain: f32,
 }
 
 impl Simulation {
@@ -185,6 +187,7 @@ impl Simulation {
             amplitude: args.amplitude,
             frequency: args.frequency,
             gain: 1.0,
+            energy_gain: 1.0,
         })
     }
 
@@ -288,6 +291,7 @@ impl Simulation {
             amplitude: self.amplitude,
             frequency: 0.0002 * PI * self.dt / (self.frequency * 1000.0).recip(),
             gain: self.gain,
+            energy_gain: self.energy_gain,
         };
 
         device.create_buffer_init(&BufferInitDescriptor {
