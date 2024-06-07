@@ -1,4 +1,5 @@
 use std::{
+    fs,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -10,8 +11,8 @@ use spin_sleep_util::Interval;
 use ui::Gui;
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
-    Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
-    TextureFormat, TextureUsages, TextureViewDescriptor,
+    Limits, Maintain, MapMode, PresentMode, Queue, RequestAdapterOptions, Surface,
+    SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor,
 };
 use winit::{
     dpi::PhysicalSize,
@@ -190,7 +191,40 @@ impl<'a> App<'a> {
             self.gui.ui(ctx, gc, &mut self.simulation, &mut self.fps);
         });
 
+        // let buffer = self.simulation.download_avg_energy(&gc, &mut encoder);
+
         gc.queue.submit([encoder.finish()]);
+
+        // if self.simulation.tick >= 10000 {
+        //     static mut FIRST: bool = true;
+
+        //     if unsafe { FIRST } {
+        //         unsafe { FIRST = false };
+
+        //         let slice = buffer.slice(..);
+        //         let (tx, rx) = crossbeam_channel::bounded(1);
+        //         slice.map_async(MapMode::Read, move |_| tx.send(()).unwrap());
+
+        //         gc.device.poll(Maintain::Wait);
+
+        //         rx.recv().unwrap();
+        //         let mapped = slice.get_mapped_range();
+        //         let data = bytemuck::cast_slice::<_, f32>(&mapped);
+
+        //         let size = self.simulation.get_size();
+        //         let mut out = Vec::<f32>::with_capacity((size.1) as usize);
+        //         for y in 0..size.1 {
+        //             let idx = (y * size.0 + size.0 - 2 - 400) as usize;
+        //             out.push(data[idx]);
+        //         }
+        //         drop(mapped);
+        //         buffer.unmap();
+
+        //         fs::write("out.f32", bytemuck::cast_slice(&out)).unwrap();
+
+        //         self.simulation.running = false;
+        //     }
+        // }
 
         output.present();
         gc.window.request_redraw();

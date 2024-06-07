@@ -11,9 +11,9 @@ use encase::ShaderType;
 use image::{io::Reader, DynamicImage, GenericImage};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferUsages, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, Queue,
-    ShaderModuleDescriptor, ShaderSource,
+    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
+    CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
+    Maintain, MapMode, Queue, ShaderModuleDescriptor, ShaderSource,
 };
 use winit::dpi::PhysicalSize;
 
@@ -147,7 +147,7 @@ impl Simulation {
         let state_buffer_descriptor = BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&empty_buffer),
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC,
         };
         let state_buffer = device.create_buffer_init(&state_buffer_descriptor.clone());
         let average_energy_buffer = device.create_buffer_init(&state_buffer_descriptor);
@@ -314,6 +314,29 @@ impl Simulation {
             BufferAddress::default(),
             bytemuck::cast_slice(&empty_buffer),
         )
+    }
+
+    pub fn download_avg_energy(
+        &self,
+        gc: &GraphicsContext,
+        encoder: &mut CommandEncoder,
+    ) -> Buffer {
+        let staging_buffer = gc.device.create_buffer(&BufferDescriptor {
+            label: None,
+            size: (self.size.0 * self.size.1 * 3 * 4) as u64,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        encoder.copy_buffer_to_buffer(
+            &self.average_energy_buffer,
+            0,
+            &staging_buffer,
+            0,
+            (self.size.0 * self.size.1 * 3 * 4) as u64,
+        );
+
+        staging_buffer
     }
 }
 
