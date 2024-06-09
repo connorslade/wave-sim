@@ -114,6 +114,7 @@ async fn main() -> Result<()> {
         },
         gui: Gui {
             queue_screenshot: false,
+            queue_snapshot: false,
             show_about: false,
         },
         fps: FpsTracker {

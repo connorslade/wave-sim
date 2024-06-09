@@ -10,10 +10,11 @@ use bitflags::bitflags;
 use encase::ShaderType;
 use image::{io::Reader, DynamicImage, GenericImage};
 use wgpu::{
+    naga::DerivativeAxis,
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferUsages, CommandEncoder,
-    ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device, Queue,
-    ShaderModuleDescriptor, ShaderSource,
+    BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
+    CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
+    Queue, ShaderModuleDescriptor, ShaderSource,
 };
 use winit::dpi::PhysicalSize;
 
@@ -30,11 +31,12 @@ const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, mul: ptr<function, f32>, d
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
+    size: (u32, u32),
+
     states: Buffer,
     map_buffer: Buffer,
     average_energy_buffer: Buffer,
-    size: (u32, u32),
-
+    //staging_buffer: Buffer,
     audio: Option<Audio>,
 
     pub ticks_per_dispatch: u32,
@@ -138,21 +140,24 @@ impl Simulation {
                 out
             }
         };
-        let map_buffer_descriptor = BufferInitDescriptor {
+        let map_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: map_data.as_slice(),
             usage: BufferUsages::STORAGE,
-        };
-        let map_buffer = device.create_buffer_init(&map_buffer_descriptor);
+        });
 
-        let empty_buffer = vec![0f32; (args.size.0 * args.size.1 * 3) as usize];
-        let state_buffer_descriptor = BufferInitDescriptor {
+        let state_buffer = device.create_buffer(&BufferDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&empty_buffer),
+            size: (args.size.0 * args.size.1 * 3 * 4) as u64,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-        };
-        let state_buffer = device.create_buffer_init(&state_buffer_descriptor.clone());
-        let average_energy_buffer = device.create_buffer_init(&state_buffer_descriptor);
+            mapped_at_creation: false,
+        });
+        let average_energy_buffer = device.create_buffer(&BufferDescriptor {
+            label: None,
+            size: (args.size.0 * args.size.1 * 4) as u64,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
 
         let compute_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
             label: None,

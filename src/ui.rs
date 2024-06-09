@@ -10,6 +10,7 @@ use crate::{
 
 pub struct Gui {
     pub queue_screenshot: bool,
+    pub queue_snapshot: bool,
     pub show_about: bool,
 }
 
@@ -36,6 +37,8 @@ impl Gui {
                 let current_fps = frame_time.as_secs_f64().recip();
                 fps.fps_history.push(current_fps);
                 let avg_fps = fps.fps_history.avg();
+
+                let shift = ui.input(|i| i.modifiers.shift);
 
                 ui.label(format!("Size: {}x{}", size.0, size.1));
                 ui.horizontal(|ui| {
@@ -142,12 +145,15 @@ impl Gui {
                         .clicked()
                     {
                         simulation.reset_average_energy(&gc.queue);
-                        if ui.input(|i| !i.modifiers.shift) {
+                        if !shift {
                             simulation.reset_states(&gc.queue);
                         }
                     }
 
-                    self.queue_screenshot |= ui.button("📷").on_hover_text("Screenshot").clicked();
+                    if ui.button("📷").on_hover_text("Screenshot").clicked() {
+                        self.queue_snapshot |= shift;
+                        self.queue_screenshot |= !shift;
+                    }
 
                     self.show_about ^= ui.button("ℹ").on_hover_text("About").clicked();
                 });
