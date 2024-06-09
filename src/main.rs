@@ -1,4 +1,5 @@
 use std::{
+    fs,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -27,7 +28,10 @@ mod misc;
 mod renderer;
 mod simulation;
 mod ui;
-use misc::RingBuffer;
+use misc::{
+    util::{download_buffer, save_dated_file},
+    RingBuffer,
+};
 use renderer::Renderer;
 use simulation::{Simulation, SimulationFlags};
 
@@ -191,6 +195,11 @@ impl<'a> App<'a> {
             self.gui.ui(ctx, gc, &mut self.simulation, &mut self.fps);
         });
 
+        let snapshot = self
+            .gui
+            .queue_snapshot
+            .then(|| self.simulation.get_current_state(gc, &mut encoder));
+
         gc.queue.submit([encoder.finish()]);
 
         output.present();
@@ -201,6 +210,13 @@ impl<'a> App<'a> {
             if let Err(e) = self.renderer.screenshot(self) {
                 eprintln!("Failed to take screenshot: {:?}", e);
             }
+        }
+
+        if let Some(snapshot) = snapshot {
+            self.gui.queue_snapshot = false;
+            let data = download_buffer(&snapshot, gc);
+            let path = save_dated_file("states", "state", "bin").unwrap();
+            fs::write(path, data).unwrap();
         }
 
         self.fps.interval.tick();

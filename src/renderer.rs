@@ -1,4 +1,4 @@
-use std::{fs, mem, path::Path};
+use std::mem;
 
 use anyhow::Result;
 use bytemuck::{Pod, Zeroable};
@@ -18,7 +18,7 @@ use wgpu::{
 };
 use winit::dpi::PhysicalSize;
 
-use crate::{simulation::ShaderContext, App, TEXTURE_FORMAT};
+use crate::{misc::util, simulation::ShaderContext, App, TEXTURE_FORMAT};
 
 pub struct Renderer {
     render_pipeline: RenderPipeline,
@@ -37,7 +37,6 @@ impl Renderer {
     pub fn new(device: &Device, size: (u32, u32)) -> Self {
         let pixels = size.0 * size.1;
 
-        let vertex_size = mem::size_of::<Vertex>();
         let vertex_data = [
             Vertex::new([-1.0, -1.0, 1.0, 1.0], [0.0, 0.0]),
             Vertex::new([1.0, -1.0, 1.0, 1.0], [1.0, 0.0]),
@@ -97,7 +96,7 @@ impl Renderer {
         });
 
         let vertex_buffers = [VertexBufferLayout {
-            array_stride: vertex_size as BufferAddress,
+            array_stride: mem::size_of::<Vertex>() as BufferAddress,
             step_mode: VertexStepMode::Vertex,
             attributes: &[
                 VertexAttribute {
@@ -296,19 +295,8 @@ fn save_screenshot(mut image: ImageBuffer<Rgba<u8>, Vec<u8>>, size: (u32, u32)) 
         }
     }
 
-    let parent = Path::new("screenshots");
-
-    if !parent.exists() {
-        fs::create_dir(parent)?;
-    }
-
-    for i in 0.. {
-        let path = parent.join(format!("screenshot-{}.png", i));
-        if !path.exists() {
-            image.save(path)?;
-            break;
-        }
-    }
+    let path = util::save_dated_file("screenshots", "screenshot", "png")?;
+    image.save(path)?;
 
     Ok(())
 }

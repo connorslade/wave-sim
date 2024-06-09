@@ -10,7 +10,6 @@ use bitflags::bitflags;
 use encase::ShaderType;
 use image::{io::Reader, DynamicImage, GenericImage};
 use wgpu::{
-    naga::DerivativeAxis,
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
     CommandEncoder, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
@@ -57,8 +56,8 @@ pub struct Simulation {
 bitflags! {
     #[derive(Clone, Copy)]
     pub struct SimulationFlags: u32 {
-        const REFLECTIVE_BOUNDARY = 0b0001;
-        const ENERGY_VIEW = 0b0010;
+        const REFLECTIVE_BOUNDARY = 1 << 0;
+        const ENERGY_VIEW = 1 << 1;
     }
 }
 
@@ -149,7 +148,7 @@ impl Simulation {
         let state_buffer = device.create_buffer(&BufferDescriptor {
             label: None,
             size: (args.size.0 * args.size.1 * 3 * 4) as u64,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
         let average_energy_buffer = device.create_buffer(&BufferDescriptor {
@@ -304,6 +303,21 @@ impl Simulation {
             contents: &context.to_wgsl_bytes(),
             usage: BufferUsages::UNIFORM,
         })
+    }
+
+    pub fn get_current_state(&self, gc: &GraphicsContext, encoder: &mut CommandEncoder) -> Buffer {
+        let state_size = (self.size.0 * self.size.1 * 4) as u64;
+        let buffer = gc.device.create_buffer(&BufferDescriptor {
+            label: None,
+            size: state_size,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let offset = (self.tick % 3) * state_size;
+        encoder.copy_buffer_to_buffer(&self.states, offset, &buffer, 0, buffer.size());
+
+        buffer
     }
 
     pub fn reset_states(&mut self, queue: &Queue) {
