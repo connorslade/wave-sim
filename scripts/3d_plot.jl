@@ -3,7 +3,7 @@ using GLMakie
 STATE_PATH = "states"
 WIDTH = 1440
 HEIGHT = 900
-Z_SCALE = 30
+Z_SCALE = 250
 
 states = readdir(STATE_PATH)
 
@@ -30,11 +30,12 @@ GLMakie.closeall()
 data = Observable(load_state(states[1]))
 
 fig = Figure(resolution = (1920, 1080))
-axis = Axis3(fig[1, 1], aspect = (WIDTH, HEIGHT, Z_SCALE), azimuth = 6.275pi, xlabel = "x", ylabel = "y", zlabel = "z")
+axis = Axis3(fig[1, 1], aspect = (WIDTH, HEIGHT, Z_SCALE), azimuth = 6.275pi, elevation = 0.16pi, xlabel = "x", ylabel = "y", zlabel = "z")
 surface!(axis, data, colormap = :viridis)
 
 record(fig, "3d_plot.mp4", 1:length(states)) do frame
 	print("\r$(round(Int, 100 * frame / length(states)))%")
-	data[] = load_state(states[frame]) * Z_SCALE
+	data[] = load_state(states[frame])
 end
 
+println("\nDone!")
