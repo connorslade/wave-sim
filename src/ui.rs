@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use bitflags::Flags;
 use egui::{emath::Numeric, Color32, Context, DragValue, RichText, Slider, Ui, Window};
+use wgpu::{Buffer, CommandEncoder};
 
 use crate::{
     simulation::{Simulation, SimulationFlags},
@@ -10,8 +11,14 @@ use crate::{
 
 pub struct Gui {
     pub queue_screenshot: bool,
-    pub queue_snapshot: bool,
+    pub queue_snapshot: SnapshotType,
     pub show_about: bool,
+}
+
+pub enum SnapshotType {
+    None,
+    State,
+    Energy,
 }
 
 const COURANT_TIP: &str =
@@ -38,7 +45,7 @@ impl Gui {
                 fps.fps_history.push(current_fps);
                 let avg_fps = fps.fps_history.avg();
 
-                let shift = ui.input(|i| i.modifiers.shift);
+                let (shift, ctrl) = ui.input(|i| (i.modifiers.shift, i.modifiers.ctrl));
 
                 ui.label(format!("Size: {}x{}", size.0, size.1));
                 ui.horizontal(|ui| {
@@ -150,9 +157,18 @@ impl Gui {
                         }
                     }
 
-                    if ui.button("📷").on_hover_text("Screenshot").clicked() {
-                        self.queue_snapshot |= shift;
-                        self.queue_screenshot |= !shift;
+                    if ui
+                        .button("📷")
+                        .on_hover_text("Screenshot\nHold shift for state and ctrl for avg energy.")
+                        .clicked()
+                    {
+                        if shift {
+                            self.queue_snapshot = SnapshotType::State;
+                        } else if ctrl {
+                            self.queue_snapshot = SnapshotType::Energy;
+                        } else {
+                            self.queue_screenshot = true;
+                        }
                     }
 
                     self.show_about ^= ui.button("ℹ").on_hover_text("About").clicked();
@@ -191,4 +207,26 @@ fn bit_checkbox<Value: Flags + Copy>(ui: &mut Ui, label: &str, value: &mut Value
     let mut bool_value = value.contains(flag);
     ui.checkbox(&mut bool_value, label);
     value.set(flag, bool_value);
+}
+
+impl SnapshotType {
+    pub fn name(&self) -> &'static str {
+        match self {
+            SnapshotType::None => "none",
+            SnapshotType::State => "state",
+            SnapshotType::Energy => "energy",
+        }
+    }
+
+    pub fn stage<'a>(
+        &self,
+        simulation: &'a Simulation,
+        encoder: &mut CommandEncoder,
+    ) -> Option<&'a Buffer> {
+        Some(match self {
+            SnapshotType::State => simulation.stage_state(encoder),
+            SnapshotType::Energy => simulation.stage_energy(encoder),
+            SnapshotType::None => return None,
+        })
+    }
 }

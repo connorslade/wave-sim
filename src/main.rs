@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use egui::Egui;
 use image::ImageFormat;
 use spin_sleep_util::Interval;
-use ui::Gui;
+use ui::{Gui, SnapshotType};
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
     Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
@@ -118,7 +118,7 @@ async fn main() -> Result<()> {
         },
         gui: Gui {
             queue_screenshot: false,
-            queue_snapshot: false,
+            queue_snapshot: SnapshotType::None,
             show_about: false,
         },
         fps: FpsTracker {
@@ -198,7 +198,7 @@ impl<'a> App<'a> {
         let snapshot = self
             .gui
             .queue_snapshot
-            .then(|| self.simulation.get_current_state(gc, &mut encoder));
+            .stage(&self.simulation, &mut encoder);
 
         gc.queue.submit([encoder.finish()]);
 
@@ -213,10 +213,10 @@ impl<'a> App<'a> {
         }
 
         if let Some(snapshot) = snapshot {
-            self.gui.queue_snapshot = false;
-            let data = download_buffer(&snapshot, gc);
-            let path = save_dated_file("states", "state", "bin").unwrap();
+            let data = download_buffer(snapshot, gc);
+            let path = save_dated_file("states", self.gui.queue_snapshot.name(), "bin").unwrap();
             fs::write(path, data).unwrap();
+            self.gui.queue_snapshot = SnapshotType::None;
         }
 
         self.fps.interval.tick();

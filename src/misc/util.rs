@@ -46,5 +46,8 @@ pub fn download_buffer(buffer: &Buffer, gc: &GraphicsContext) -> Vec<u8> {
     gc.device.poll(MaintainBase::Wait);
     rx.recv().unwrap();
 
-    slice.get_mapped_range().to_vec()
+    let data = slice.get_mapped_range().to_vec();
+    buffer.unmap();
+
+    data
 }

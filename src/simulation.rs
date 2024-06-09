@@ -35,7 +35,7 @@ pub struct Simulation {
     states: Buffer,
     map_buffer: Buffer,
     average_energy_buffer: Buffer,
-    //staging_buffer: Buffer,
+    staging_buffer: Buffer,
     audio: Option<Audio>,
 
     pub ticks_per_dispatch: u32,
@@ -80,15 +80,15 @@ pub struct ShaderContext {
 }
 
 impl Simulation {
-    pub fn new(device: &Device, args: &Config) -> Result<Self> {
-        let map = args
+    pub fn new(device: &Device, config: &Config) -> Result<Self> {
+        let map = config
             .map
             .as_ref()
             .map(|map| {
-                let mut image = DynamicImage::new_rgba8(args.size.0, args.size.1);
-                let map = Reader::open(args.base_path().join(map))?.decode()?;
-                let x = (args.size.0 - map.width()) / 2;
-                let y = (args.size.1 - map.height()) / 2;
+                let mut image = DynamicImage::new_rgba8(config.size.0, config.size.1);
+                let map = Reader::open(config.base_path().join(map))?.decode()?;
+                let x = (config.size.0 - map.width()) / 2;
+                let y = (config.size.1 - map.height()) / 2;
                 image
                     .copy_from(&map, x, y)
                     .context("Map must have a size equal or smaller than the simulation size.")?;
@@ -96,21 +96,21 @@ impl Simulation {
             })
             .transpose()?;
 
-        let audio = args
+        let audio = config
             .audio
             .as_ref()
             .map(|x| {
                 Audio::new(
                     device,
-                    File::open(args.base_path().join(&x.input))?,
-                    File::create(args.base_path().join(&x.output))?,
+                    File::open(config.base_path().join(&x.input))?,
+                    File::create(config.base_path().join(&x.output))?,
                 )
             })
             .transpose()?;
 
         let mut raw_shader = Cow::Borrowed(include_str!("shaders/shader.wgsl"));
-        if let Some(ref shader) = args.shader {
-            let shader = fs::read_to_string(args.base_path().join(shader)).unwrap();
+        if let Some(ref shader) = config.shader {
+            let shader = fs::read_to_string(config.base_path().join(shader)).unwrap();
             let line_end = raw_shader.find('\n').unwrap();
             raw_shader = Cow::Owned(format!(
                 "{TICK_SIGNATURE} {{\n{shader}\n}}{}",
@@ -119,7 +119,7 @@ impl Simulation {
         }
 
         let mut preprocessor = Preprocessor::new();
-        if let Some(audio) = &args.audio {
+        if let Some(audio) = &config.audio {
             preprocessor = preprocessor.define("AUDIO", Data::vec2(audio.pickup.0, audio.pickup.1));
         } else {
             preprocessor = preprocessor.define("OSCILLATOR", Data::Null);
@@ -134,7 +134,7 @@ impl Simulation {
         let map_data = match map {
             Some(map) => map.into_rgba8().into_raw(),
             None => {
-                let mut out = vec![0; (args.size.0 * args.size.1) as usize * 4];
+                let mut out = vec![0; (config.size.0 * config.size.1) as usize * 4];
                 out.chunks_exact_mut(4).for_each(|x| x[2] = 128);
                 out
             }
@@ -147,14 +147,21 @@ impl Simulation {
 
         let state_buffer = device.create_buffer(&BufferDescriptor {
             label: None,
-            size: (args.size.0 * args.size.1 * 3 * 4) as u64,
+            size: (config.size.0 * config.size.1 * 3 * 4) as u64,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
         let average_energy_buffer = device.create_buffer(&BufferDescriptor {
             label: None,
-            size: (args.size.0 * args.size.1 * 4) as u64,
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            size: (config.size.0 * config.size.1 * 4) as u64,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+
+        let staging_buffer = device.create_buffer(&BufferDescriptor {
+            label: None,
+            size: (config.size.0 * config.size.1 * 4) as u64,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
 
@@ -166,17 +173,18 @@ impl Simulation {
         });
 
         let mut flags = SimulationFlags::empty();
-        if args.reflective_boundary {
+        if config.reflective_boundary {
             flags |= SimulationFlags::REFLECTIVE_BOUNDARY;
         }
 
         Ok(Self {
             compute_pipeline,
+            size: config.size,
+
             states: state_buffer,
             map_buffer,
             average_energy_buffer,
-            size: args.size,
-
+            staging_buffer,
             audio,
 
             ticks_per_dispatch: 1,
@@ -184,12 +192,12 @@ impl Simulation {
             running: false,
             flags,
 
-            dt: args.dt,
-            dx: args.dx,
+            dt: config.dt,
+            dx: config.dx,
 
-            v: args.v,
-            amplitude: args.amplitude,
-            frequency: args.frequency,
+            v: config.v,
+            amplitude: config.amplitude,
+            frequency: config.frequency,
             gain: 1.0,
             energy_gain: 1.0,
         })
@@ -305,19 +313,27 @@ impl Simulation {
         })
     }
 
-    pub fn get_current_state(&self, gc: &GraphicsContext, encoder: &mut CommandEncoder) -> Buffer {
-        let state_size = (self.size.0 * self.size.1 * 4) as u64;
-        let buffer = gc.device.create_buffer(&BufferDescriptor {
-            label: None,
-            size: state_size,
-            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
+    pub fn stage_state(&self, encoder: &mut CommandEncoder) -> &Buffer {
+        let offset = (self.tick % 3) * (self.size.0 * self.size.1 * 4) as u64;
+        encoder.copy_buffer_to_buffer(
+            &self.states,
+            offset,
+            &self.staging_buffer,
+            0,
+            self.staging_buffer.size(),
+        );
+        &self.staging_buffer
+    }
 
-        let offset = (self.tick % 3) * state_size;
-        encoder.copy_buffer_to_buffer(&self.states, offset, &buffer, 0, buffer.size());
-
-        buffer
+    pub fn stage_energy(&self, encoder: &mut CommandEncoder) -> &Buffer {
+        encoder.copy_buffer_to_buffer(
+            &self.average_energy_buffer,
+            0,
+            &self.staging_buffer,
+            0,
+            self.staging_buffer.size(),
+        );
+        &self.staging_buffer
     }
 
     pub fn reset_states(&mut self, queue: &Queue) {
