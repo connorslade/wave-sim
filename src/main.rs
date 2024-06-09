@@ -213,9 +213,15 @@ impl<'a> App<'a> {
         }
 
         if let Some(snapshot) = snapshot {
-            let data = download_buffer(snapshot, gc);
+            let mut data = Vec::with_capacity(8 + snapshot.size() as usize);
+            let size = self.simulation.get_size();
+            data.extend_from_slice(&size.0.to_le_bytes());
+            data.extend_from_slice(&size.1.to_le_bytes());
+            data.extend_from_slice(&download_buffer(snapshot, gc));
+
             let path = save_dated_file("states", self.gui.queue_snapshot.name(), "bin").unwrap();
             fs::write(path, data).unwrap();
+
             self.gui.queue_snapshot = SnapshotType::None;
         }
 
