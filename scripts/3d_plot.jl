@@ -5,12 +5,13 @@ WIDTH = 1440
 HEIGHT = 900
 Z_SCALE = 250
 
-states = readdir(STATE_PATH)
-
 function load_state(name)
 	state = read(STATE_PATH * "/" * name)
 	return reshape(reinterpret(Float32, state[9:end]), (WIDTH, HEIGHT))[:, 5:end]
 end
+
+
+states = readdir(STATE_PATH)
 
 println("Found $(length(states)) states")
 
