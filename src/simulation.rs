@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, Result};
 use bitflags::bitflags;
 use encase::ShaderType;
-use image::{io::Reader, DynamicImage, GenericImage};
+use image::{DynamicImage, GenericImage, ImageReader};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
@@ -86,7 +86,7 @@ impl Simulation {
             .as_ref()
             .map(|map| {
                 let mut image = DynamicImage::new_rgba8(config.size.0, config.size.1);
-                let map = Reader::open(config.base_path().join(map))?.decode()?;
+                let map = ImageReader::open(config.base_path().join(map))?.decode()?;
                 let x = (config.size.0 - map.width()) / 2;
                 let y = (config.size.1 - map.height()) / 2;
                 image
