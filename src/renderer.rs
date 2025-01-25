@@ -1,20 +1,18 @@
 use std::mem;
 
 use anyhow::Result;
-use bytemuck::{Pod, Zeroable};
 use image::{GenericImageView, ImageBuffer, Rgba};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferSize,
-    BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, CommandEncoderDescriptor, Device,
-    Extent3d, Face, FragmentState, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, IndexFormat,
-    LoadOp, Maintain, MapMode, MultisampleState, Operations, Origin3d, PipelineLayoutDescriptor,
+    BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferSize, BufferUsages,
+    ColorTargetState, ColorWrites, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d,
+    Face, FragmentState, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, IndexFormat, LoadOp,
+    Maintain, MapMode, MultisampleState, Operations, Origin3d, PipelineLayoutDescriptor,
     PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
     RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages, StoreOp,
     TextureAspect, TextureDescriptor, TextureDimension, TextureUsages, TextureView,
-    TextureViewDescriptor, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
-    VertexStepMode, COPY_BYTES_PER_ROW_ALIGNMENT,
+    TextureViewDescriptor, VertexState, COPY_BYTES_PER_ROW_ALIGNMENT,
 };
 use winit::dpi::PhysicalSize;
 
@@ -23,34 +21,15 @@ use crate::{misc::util, simulation::ShaderContext, App, TEXTURE_FORMAT};
 pub struct Renderer {
     render_pipeline: RenderPipeline,
     bind_group_layout: BindGroupLayout,
-    vertex_buf: Buffer,
     index_buf: Buffer,
-}
-
-#[derive(Copy, Clone)]
-struct Vertex {
-    _position: [f32; 4],
-    _tex_coords: [f32; 2],
 }
 
 impl Renderer {
     pub fn new(device: &Device, size: (u32, u32)) -> Self {
         let pixels = size.0 * size.1;
 
-        let vertex_data = [
-            Vertex::new([-1.0, -1.0, 1.0, 1.0], [0.0, 0.0]),
-            Vertex::new([1.0, -1.0, 1.0, 1.0], [1.0, 0.0]),
-            Vertex::new([1.0, 1.0, 1.0, 1.0], [1.0, 1.0]),
-            Vertex::new([-1.0, 1.0, 1.0, 1.0], [0.0, 1.0]),
-        ];
-
         let index_data: &[u16] = &[0, 1, 2, 2, 3, 0];
 
-        let vertex_buf = device.create_buffer_init(&BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&vertex_data),
-            usage: BufferUsages::VERTEX,
-        });
         let index_buf = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(index_data),
@@ -95,23 +74,6 @@ impl Renderer {
             ],
         });
 
-        let vertex_buffers = [VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as BufferAddress,
-            step_mode: VertexStepMode::Vertex,
-            attributes: &[
-                VertexAttribute {
-                    format: VertexFormat::Float32x4,
-                    offset: 0,
-                    shader_location: 0,
-                },
-                VertexAttribute {
-                    format: VertexFormat::Float32x2,
-                    offset: 4 * 4,
-                    shader_location: 1,
-                },
-            ],
-        }];
-
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[&bind_group_layout],
@@ -124,7 +86,7 @@ impl Renderer {
             vertex: VertexState {
                 module: &render_shader,
                 entry_point: "vert",
-                buffers: &vertex_buffers,
+                buffers: &[],
             },
             fragment: Some(FragmentState {
                 module: &render_shader,
@@ -147,7 +109,6 @@ impl Renderer {
         Self {
             render_pipeline,
             bind_group_layout,
-            vertex_buf,
             index_buf,
         }
     }
@@ -199,7 +160,6 @@ impl Renderer {
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &bind_group, &[]);
         render_pass.set_index_buffer(self.index_buf.slice(..), IndexFormat::Uint16);
-        render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
         render_pass.draw_indexed(0..6, 0, 0..1);
     }
 
@@ -300,15 +260,3 @@ fn save_screenshot(mut image: ImageBuffer<Rgba<u8>, Vec<u8>>, size: (u32, u32)) 
 
     Ok(())
 }
-
-impl Vertex {
-    const fn new(position: [f32; 4], tex_coords: [f32; 2]) -> Self {
-        Self {
-            _position: position,
-            _tex_coords: tex_coords,
-        }
-    }
-}
-
-unsafe impl Zeroable for Vertex {}
-unsafe impl Pod for Vertex {}

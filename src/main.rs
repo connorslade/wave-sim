@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-impl<'a> App<'a> {
+impl App<'_> {
     fn render(&mut self) {
         let gc = &self.graphics;
         let context_buffer = self
