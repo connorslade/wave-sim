@@ -59,6 +59,7 @@ bitflags! {
     pub struct SimulationFlags: u32 {
         const REFLECTIVE_BOUNDARY = 1 << 0;
         const ENERGY_VIEW = 1 << 1;
+        const BILINIER_SAMPLING = 1 << 2;
     }
 }
 
@@ -169,7 +170,7 @@ impl Simulation {
             entry_point: "main",
         });
 
-        let mut flags = SimulationFlags::empty();
+        let mut flags = SimulationFlags::BILINIER_SAMPLING;
         if config.reflective_boundary {
             flags |= SimulationFlags::REFLECTIVE_BOUNDARY;
         }

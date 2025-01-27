@@ -130,6 +130,12 @@ impl Gui {
                     &mut simulation.flags,
                     SimulationFlags::ENERGY_VIEW,
                 );
+                bit_checkbox(
+                    ui,
+                    "Smooth Sampling",
+                    &mut simulation.flags,
+                    SimulationFlags::BILINIER_SAMPLING,
+                );
 
                 ui.separator();
 

@@ -53,6 +53,60 @@ fn index(x: u32, y: u32, n: u32) -> u32 {
     return (ctx.size.x * ctx.size.y * n) + (y * ctx.size.x) + x;
 }
 
+fn nearest_neighbor_sample_avg_energy(pos: vec2<i32>) -> f32 {
+    return average_energy[u32(pos.y) * ctx.size.x + u32(pos.x)];
+}
+
+fn bilinear_sample_avg_energy(origin: vec2<f32>, pos: vec2<i32>) -> f32 {
+    let x = vec2<i32>(max(0, min(i32(ctx.size.x) - 1, pos.x)), max(0, min(i32(ctx.size.x) - 1, pos.x + 1)));
+    let y = vec2<i32>(max(0, min(i32(ctx.size.y) - 1, pos.y)), max(0, min(i32(ctx.size.y) - 1, pos.y + 1)));
+
+    let s = vec4<f32>(
+        nearest_neighbor_sample_avg_energy(vec2<i32>(x.x, y.x)),
+        nearest_neighbor_sample_avg_energy(vec2<i32>(x.y, y.x)),
+        nearest_neighbor_sample_avg_energy(vec2<i32>(x.x, y.y)),
+        nearest_neighbor_sample_avg_energy(vec2<i32>(x.y, y.y))
+    );
+
+    let f = fract((origin - ctx.pan) * ctx.zoom);
+    return mix(mix(s.x, s.y, f.x), mix(s.z, s.w, f.x), f.y);
+}
+
+fn sample_avg_energy(origin: vec2<f32>, pos: vec2<i32>) -> f32 {
+    if (ctx.flags & 0x04) != 0 {
+        return bilinear_sample_avg_energy(origin, pos);
+    } else {
+        return nearest_neighbor_sample_avg_energy(pos);
+    }
+}
+
+fn nearest_neighbor_sample(pos: vec2<i32>, tick: u32) -> f32 {
+    return states[index(u32(pos.x), u32(pos.y), tick % 3)];
+}
+
+fn bilinear_sample(origin: vec2<f32>, pos: vec2<i32>, tick: u32) -> f32 {
+    let x = vec2<i32>(max(0, min(i32(ctx.size.x) - 1, pos.x)), max(0, min(i32(ctx.size.x) - 1, pos.x + 1)));
+    let y = vec2<i32>(max(0, min(i32(ctx.size.y) - 1, pos.y)), max(0, min(i32(ctx.size.y) - 1, pos.y + 1)));
+
+    let s = vec4<f32>(
+        nearest_neighbor_sample(vec2<i32>(x.x, y.x), tick),
+        nearest_neighbor_sample(vec2<i32>(x.y, y.x), tick),
+        nearest_neighbor_sample(vec2<i32>(x.x, y.y), tick),
+        nearest_neighbor_sample(vec2<i32>(x.y, y.y), tick)
+    );
+
+    let f = fract((origin - ctx.pan) * ctx.zoom);
+    return mix(mix(s.x, s.y, f.x), mix(s.z, s.w, f.x), f.y);
+}
+
+fn sample(origin: vec2<f32>, pos: vec2<i32>) -> f32 {
+    if (ctx.flags & 0x04) != 0 {
+        return bilinear_sample(origin, pos, ctx.tick);
+    } else {
+        return nearest_neighbor_sample(pos, ctx.tick);
+    }
+}
+
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     let pos = vec2<i32>((in.position.xy - ctx.pan)  * ctx.zoom );
@@ -64,7 +118,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     if (ctx.flags & 0x02) != 0 {
-        var val = clamp(average_energy[u32(pos.y) * ctx.size.x + u32(pos.x)] * ctx.energy_gain, 0.0, 1.0);
+        var val = clamp(sample_avg_energy(in.position.xy, pos) * ctx.energy_gain, 0.0, 1.0);
         let scheme_index = u32(val * 3.0);
         val = val * 3.0 - f32(scheme_index);
 
@@ -85,7 +139,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(color, 1.0);
     }
 
-    let val = states[index(u32(pos.x), u32(pos.y), ctx.tick % 3)] * ctx.gain;
+    let val = sample(in.position.xy, pos) * ctx.gain;
     let color = (
           vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0)
         + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0)
