@@ -179,7 +179,7 @@ impl Renderer {
                 gain: app.simulation.gain,
                 energy_gain: app.simulation.energy_gain,
                 pan: self.pan,
-                zoom: self.zoom,
+                zoom: self.zoom.powi(2),
             })
             .unwrap();
         gc.queue

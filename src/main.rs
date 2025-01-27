@@ -1,13 +1,8 @@
-use std::{
-    fs,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{fs, sync::Arc, time::Instant};
 
 use anyhow::{Context, Result};
 use egui::Egui;
 use image::ImageFormat;
-use spin_sleep_util::Interval;
 use ui::{Gui, SnapshotType};
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
@@ -59,9 +54,6 @@ struct GraphicsContext<'a> {
 struct FpsTracker {
     fps_history: RingBuffer<f64, 256>,
     last_frame: Instant,
-
-    interval: Interval,
-    target_fps: u32,
 }
 
 #[pollster::main]
@@ -123,8 +115,6 @@ async fn main() -> Result<()> {
         },
         fps: FpsTracker {
             fps_history: RingBuffer::new(),
-            target_fps: 60,
-            interval: spin_sleep_util::interval(Duration::from_secs_f64(60_f64.recip())),
             last_frame: Instant::now(),
         },
     };
@@ -226,8 +216,6 @@ impl App<'_> {
 
             self.gui.queue_snapshot = SnapshotType::None;
         }
-
-        self.fps.interval.tick();
     }
 
     fn configure_surface(&mut self) {

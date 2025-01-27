@@ -21,7 +21,6 @@ pollster = { version = "0.3.0", features = ["macro"] }
 rubato = "0.15.0"
 serde = { version = "1.0.201", features = ["derive"] }
 soon = { git = "https://github.com/connorslade/misc" }
-spin_sleep_util = "0.1.1"
 toml = "0.8.12"
 wgpu = "0.19.4"
 winit = "0.29.15"

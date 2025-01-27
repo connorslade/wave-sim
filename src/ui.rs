@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use bitflags::Flags;
 use egui::{emath::Numeric, Color32, Context, DragValue, RichText, Slider, Ui, Window};
@@ -48,8 +48,8 @@ impl Gui {
             let pointer = Vector2::new(pointer.x, pointer.y) * scale_factor;
 
             let old_zoom = render.zoom;
-            render.zoom = (old_zoom + input.smooth_scroll_delta.y / 1000.0).max(0.05);
-            render.pan += (pointer - render.pan) * (1.0 - (old_zoom / render.zoom));
+            render.zoom = (old_zoom - input.smooth_scroll_delta.y / 1000.0).max(0.05);
+            render.pan += (pointer - render.pan) * (1.0 - (old_zoom.powi(2) / render.zoom.powi(2)));
 
             if input.pointer.any_down() && dragging_viewport {
                 let delta = input.pointer.delta() * scale_factor;
