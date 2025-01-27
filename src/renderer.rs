@@ -1,7 +1,9 @@
 use std::mem;
 
 use anyhow::Result;
+use encase::{ShaderType, UniformBuffer};
 use image::{GenericImageView, ImageBuffer, Rgba};
+use nalgebra::Vector2;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -14,14 +16,27 @@ use wgpu::{
     TextureAspect, TextureDescriptor, TextureDimension, TextureUsages, TextureView,
     TextureViewDescriptor, VertexState, COPY_BYTES_PER_ROW_ALIGNMENT,
 };
-use winit::dpi::PhysicalSize;
 
-use crate::{misc::util, simulation::ShaderContext, App, TEXTURE_FORMAT};
+use crate::{misc::util, App, TEXTURE_FORMAT};
 
 pub struct Renderer {
     render_pipeline: RenderPipeline,
     bind_group_layout: BindGroupLayout,
-    index_buf: Buffer,
+    index: Buffer,
+    context: Buffer,
+
+    pub pan: Vector2<f32>,
+}
+
+#[derive(ShaderType, Default)]
+pub struct RenderContext {
+    size: Vector2<u32>,
+    window: Vector2<u32>,
+
+    tick: u32,
+    flags: u32,
+    gain: f32,
+    energy_gain: f32,
 }
 
 impl Renderer {
@@ -30,10 +45,18 @@ impl Renderer {
 
         let index_data: &[u16] = &[0, 1, 2, 2, 3, 0];
 
-        let index_buf = device.create_buffer_init(&BufferInitDescriptor {
+        let index = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(index_data),
             usage: BufferUsages::INDEX,
+        });
+
+        let mut context = UniformBuffer::new(Vec::new());
+        context.write(&RenderContext::default()).unwrap();
+        let context = device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: &context.into_inner(),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
         let render_shader = device.create_shader_module(ShaderModuleDescriptor {
@@ -55,7 +78,9 @@ impl Renderer {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(mem::size_of::<ShaderContext>() as _),
+                        min_binding_size: BufferSize::new(
+                            dbg!(mem::size_of::<RenderContext>()) as _
+                        ),
                     },
                     count: None,
                 },
@@ -109,24 +134,21 @@ impl Renderer {
         Self {
             render_pipeline,
             bind_group_layout,
-            index_buf,
+            index,
+            context,
+
+            pan: Vector2::zeros(),
         }
     }
 
-    pub fn render(
-        &self,
-        app: &App,
-        encoder: &mut CommandEncoder,
-        context_buffer: &Buffer,
-        view: &TextureView,
-    ) {
+    pub fn render(&self, app: &App, encoder: &mut CommandEncoder, view: &TextureView) {
         let gc = &app.graphics;
         let bind_group = gc.device.create_bind_group(&BindGroupDescriptor {
             layout: &self.bind_group_layout,
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: context_buffer.as_entire_binding(),
+                    resource: self.context.as_entire_binding(),
                 },
                 BindGroupEntry {
                     binding: 1,
@@ -142,6 +164,23 @@ impl Renderer {
             ],
             label: None,
         });
+
+        let window = app.graphics.window.inner_size();
+        let mut context = UniformBuffer::new(Vec::new());
+        context
+            .write(&RenderContext {
+                size: app.simulation.get_size(),
+                window: Vector2::new(window.width, window.height),
+                tick: app.simulation.tick as u32,
+                flags: app.simulation.flags.bits(),
+
+                // TODO: move out of simulation
+                gain: app.simulation.gain,
+                energy_gain: app.simulation.energy_gain,
+            })
+            .unwrap();
+        gc.queue
+            .write_buffer(&self.context, 0, &context.into_inner());
 
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: None,
@@ -159,22 +198,19 @@ impl Renderer {
         });
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &bind_group, &[]);
-        render_pass.set_index_buffer(self.index_buf.slice(..), IndexFormat::Uint16);
+        render_pass.set_index_buffer(self.index.slice(..), IndexFormat::Uint16);
         render_pass.draw_indexed(0..6, 0, 0..1);
     }
 
     pub fn screenshot(&self, app: &App) -> Result<()> {
         let gc = &app.graphics;
         let size = app.simulation.get_size();
-        let context_buffer = app
-            .simulation
-            .get_context_buffer(&gc.device, PhysicalSize::new(size.0, size.1));
 
         let texture = gc.device.create_texture(&TextureDescriptor {
             label: None,
             size: Extent3d {
-                width: size.0,
-                height: size.1,
+                width: size.x,
+                height: size.y,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -186,10 +222,10 @@ impl Renderer {
         });
 
         const ALIGNMENT_BYTES: u64 = COPY_BYTES_PER_ROW_ALIGNMENT as u64 - 1;
-        let row_bytes = (size.0 as u64 * 4 + ALIGNMENT_BYTES) & !ALIGNMENT_BYTES;
+        let row_bytes = (size.x as u64 * 4 + ALIGNMENT_BYTES) & !ALIGNMENT_BYTES;
         let screenshot_buffer = gc.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: row_bytes * size.1 as u64,
+            size: row_bytes * size.y as u64,
             usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
@@ -199,7 +235,7 @@ impl Renderer {
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         let view = texture.create_view(&TextureViewDescriptor::default());
-        self.render(app, &mut encoder, &context_buffer, &view);
+        self.render(app, &mut encoder, &view);
 
         encoder.copy_texture_to_buffer(
             ImageCopyTexture {
@@ -217,8 +253,8 @@ impl Renderer {
                 },
             },
             Extent3d {
-                width: size.0,
-                height: size.1,
+                width: size.x,
+                height: size.y,
                 depth_or_array_layers: 1,
             },
         );
@@ -239,13 +275,13 @@ impl Renderer {
         screenshot_buffer.unmap();
 
         let image =
-            ImageBuffer::<Rgba<u8>, _>::from_vec(row_bytes as u32 / 4, size.1, result).unwrap();
+            ImageBuffer::<Rgba<u8>, _>::from_vec(row_bytes as u32 / 4, size.y, result).unwrap();
         save_screenshot(image, size)
     }
 }
 
-fn save_screenshot(mut image: ImageBuffer<Rgba<u8>, Vec<u8>>, size: (u32, u32)) -> Result<()> {
-    image = image.view(0, 0, size.0, size.1).to_image();
+fn save_screenshot(mut image: ImageBuffer<Rgba<u8>, Vec<u8>>, size: Vector2<u32>) -> Result<()> {
+    image = image.view(0, 0, size.x, size.y).to_image();
 
     // Convert Bgra to Rgba
     for y in 0..image.height() {

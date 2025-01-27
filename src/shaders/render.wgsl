@@ -3,20 +3,13 @@
 @group(0) @binding(2) var<storage, read> average_energy: array<f32>;
 
 struct Context {
-    width: u32,
-    height: u32,
-    window_width: u32,
-    window_height: u32,
+    size: vec2<u32>,
+    window: vec2<u32>,
 
     tick: u32,
-    ticks_per_dispatch: u32,
-    flags: u32,
     // 1 << 0: reflective boundary
     // 1 << 1: energy_view
-
-    c: f32,
-    amplitude: f32,
-    oscillation: f32,
+    flags: u32,
     gain: f32,
     energy_gain: f32
 }
@@ -54,24 +47,25 @@ const COLOR_SCHEME: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
 );
 
 fn index(x: u32, y: u32, n: u32) -> u32 {
-    return (ctx.width * ctx.height * n) + (y * ctx.width) + x;
+    return (ctx.size.x * ctx.size.y * n) + (y * ctx.size.x) + x;
 }
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    let x_offset = ctx.window_width / 2 - ctx.width / 2;
-    let y_offset = ctx.window_height / 2 - ctx.height / 2;
+    // ↓ Use vector operations
+    let x_offset = ctx.window.x / 2 - ctx.size.x / 2;
+    let y_offset = ctx.window.y / 2 - ctx.size.y / 2;
     let x = i32(in.position.x) - i32(x_offset);
     let y = i32(in.position.y) - i32(y_offset);
 
-    if x == -1 || y == -1 || x == i32(ctx.width) || y == i32(ctx.height) {
+    if x == -1 || y == -1 || x == i32(ctx.size.x) || y == i32(ctx.size.y) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-    } else if x < 0 || x > i32(ctx.width) || y < 0 || y > i32(ctx.height) {
+    } else if x < 0 || x > i32(ctx.size.x) || y < 0 || y > i32(ctx.size.y) {
         return vec4<f32>(1.0, 1.0, 1.0, 1.0);
     }
 
     if (ctx.flags & 0x02) != 0 {
-        var val = clamp(average_energy[u32(y) * ctx.width + u32(x)] * ctx.energy_gain, 0.0, 1.0);
+        var val = clamp(average_energy[u32(y) * ctx.size.x + u32(x)] * ctx.energy_gain, 0.0, 1.0);
         let scheme_index = u32(val * 3.0);
         val = val * 3.0 - f32(scheme_index);
 

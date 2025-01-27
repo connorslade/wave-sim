@@ -1,8 +1,8 @@
 // Shader has access to the following variables and functions:
 // - `x` and `y` are the coordinates of the current cell
 // - `ctx` is the context of the simulation
-//     - `ctx.width` and `ctx.height` are the dimensions of the grid
-//     - `ctx.window_width` and `ctx.window_height` are the dimensions of the window
+//     - `ctx.size.x` and `ctx.height` are the dimensions of the grid
+//     - `ctx.window.x` and `ctx.window.y` are the dimensions of the window
 //     - `ctx.tick` is the number of time steps since the start of the simulation
 //     - `ctx.c` is the c parameter of the simulation
 //     - `ctx.amplitude` is the amplitude parameter of the simulation

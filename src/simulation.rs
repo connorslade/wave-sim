@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use bitflags::bitflags;
 use encase::ShaderType;
 use image::{DynamicImage, GenericImage, ImageReader};
+use nalgebra::Vector2;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroupDescriptor, BindGroupEntry, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
@@ -30,7 +31,7 @@ const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, mul: ptr<function, f32>, d
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
-    size: (u32, u32),
+    size: Vector2<u32>,
 
     states: Buffer,
     map_buffer: Buffer,
@@ -62,11 +63,9 @@ bitflags! {
 }
 
 #[derive(ShaderType)]
-pub struct ShaderContext {
-    width: u32,
-    height: u32,
-    window_width: u32,
-    window_height: u32,
+pub struct SimulationContext {
+    size: Vector2<u32>,
+    window: Vector2<u32>,
 
     tick: u32,
     ticks_per_dispatch: u32,
@@ -75,8 +74,6 @@ pub struct ShaderContext {
     c: f32,
     amplitude: f32,
     frequency: f32,
-    gain: f32,
-    energy_gain: f32,
 }
 
 impl Simulation {
@@ -179,7 +176,7 @@ impl Simulation {
 
         Ok(Self {
             compute_pipeline,
-            size: config.size,
+            size: Vector2::new(config.size.0, config.size.1),
 
             states: state_buffer,
             map_buffer,
@@ -211,7 +208,7 @@ impl Simulation {
         &self.average_energy_buffer
     }
 
-    pub fn get_size(&self) -> (u32, u32) {
+    pub fn get_size(&self) -> Vector2<u32> {
         self.size
     }
 
@@ -273,7 +270,7 @@ impl Simulation {
             });
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
-            compute_pass.dispatch_workgroups(self.size.0.div_ceil(8), self.size.1.div_ceil(8), 1);
+            compute_pass.dispatch_workgroups(self.size.x.div_ceil(8), self.size.y.div_ceil(8), 1);
             drop(compute_pass);
 
             if let Some(audio) = &mut self.audio {
@@ -289,11 +286,9 @@ impl Simulation {
     }
 
     pub fn get_context_buffer(&self, device: &Device, window_size: PhysicalSize<u32>) -> Buffer {
-        let context = ShaderContext {
-            width: self.size.0,
-            height: self.size.1,
-            window_width: window_size.width,
-            window_height: window_size.height,
+        let context = SimulationContext {
+            size: self.size,
+            window: Vector2::new(window_size.width, window_size.height),
 
             tick: self.tick as u32,
             ticks_per_dispatch: self.ticks_per_dispatch,
@@ -302,8 +297,6 @@ impl Simulation {
             c: 0.002 * self.dt * self.v / self.dx,
             amplitude: self.amplitude,
             frequency: 0.0002 * PI * self.dt / (self.frequency * 1000.0).recip(),
-            gain: self.gain,
-            energy_gain: self.energy_gain,
         };
 
         device.create_buffer_init(&BufferInitDescriptor {
@@ -314,7 +307,7 @@ impl Simulation {
     }
 
     pub fn stage_state(&self, encoder: &mut CommandEncoder) -> &Buffer {
-        let offset = (self.tick % 3) * (self.size.0 * self.size.1 * 4) as u64;
+        let offset = (self.tick % 3) * (self.size.x * self.size.y * 4) as u64;
         encoder.copy_buffer_to_buffer(
             &self.states,
             offset,
@@ -338,7 +331,7 @@ impl Simulation {
 
     pub fn reset_states(&mut self, queue: &Queue) {
         self.tick = 0;
-        let empty_buffer = vec![0f32; (self.size.0 * self.size.1 * 3) as usize];
+        let empty_buffer = vec![0f32; (self.size.x * self.size.y * 3) as usize];
         queue.write_buffer(
             &self.states,
             BufferAddress::default(),
@@ -347,7 +340,7 @@ impl Simulation {
     }
 
     pub fn reset_average_energy(&mut self, queue: &Queue) {
-        let empty_buffer = vec![0f32; (self.size.0 * self.size.1) as usize];
+        let empty_buffer = vec![0f32; (self.size.x * self.size.y) as usize];
         queue.write_buffer(
             &self.average_energy_buffer,
             BufferAddress::default(),
@@ -356,7 +349,7 @@ impl Simulation {
     }
 }
 
-impl ShaderContext {
+impl SimulationContext {
     fn to_wgsl_bytes(&self) -> Vec<u8> {
         let mut buffer = encase::UniformBuffer::new(Vec::new());
         buffer.write(self).unwrap();

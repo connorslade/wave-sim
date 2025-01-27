@@ -47,7 +47,7 @@ impl Gui {
 
                 let (shift, ctrl) = ui.input(|i| (i.modifiers.shift, i.modifiers.ctrl));
 
-                ui.label(format!("Size: {}x{}", size.0, size.1));
+                ui.label(format!("Size: {}x{}", size.x, size.y));
                 ui.horizontal(|ui| {
                     ui.label(format!("FPS: {avg_fps:.1}"));
                     ui.label(format!(

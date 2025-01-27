@@ -12,9 +12,10 @@ crossbeam-channel = "0.5.12"
 egui = "0.27.2"
 egui-wgpu = "0.27.2"
 egui-winit = "0.27.2"
-encase = "0.8.0"
+encase = { version = "0.10.0", features = ["nalgebra"] }
 hound = "3.5.1"
 image = "0.25.1"
+nalgebra = { version = "0.33.2", features = ["serde-serialize"] }
 num-traits = "0.2.19"
 pollster = { version = "0.3.0", features = ["macro"] }
 rubato = "0.15.0"

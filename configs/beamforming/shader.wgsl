@@ -4,7 +4,7 @@ let i = index(x, y, current);
 let n = 15;
 let spacing = 3.0;
 
-let start_x = (f32(ctx.width) - spacing * f32(n)) / 2.0;
+let start_x = (f32(ctx.size.x) - spacing * f32(n)) / 2.0;
 let center_y = f32(ctx.height) / 2.0;
 for (var j = 0; j < n; j++) {
     let emitter = vec2<f32>(f32(start_x + spacing * f32(j)), center_y);

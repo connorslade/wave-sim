@@ -174,9 +174,6 @@ async fn main() -> Result<()> {
 impl App<'_> {
     fn render(&mut self) {
         let gc = &self.graphics;
-        let context_buffer = self
-            .simulation
-            .get_context_buffer(&gc.device, gc.window.inner_size());
         let mut encoder = gc
             .device
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
@@ -189,8 +186,7 @@ impl App<'_> {
             .texture
             .create_view(&TextureViewDescriptor::default());
 
-        self.renderer
-            .render(self, &mut encoder, &context_buffer, &view);
+        self.renderer.render(self, &mut encoder, &view);
         self.egui.render(gc, &mut encoder, &view, |ctx| {
             self.gui.ui(ctx, gc, &mut self.simulation, &mut self.fps);
         });
@@ -215,8 +211,8 @@ impl App<'_> {
         if let Some(snapshot) = snapshot {
             let mut data = Vec::with_capacity(8 + snapshot.size() as usize);
             let size = self.simulation.get_size();
-            data.extend_from_slice(&size.0.to_le_bytes());
-            data.extend_from_slice(&size.1.to_le_bytes());
+            data.extend_from_slice(&size.x.to_le_bytes());
+            data.extend_from_slice(&size.y.to_le_bytes());
             data.extend_from_slice(&download_buffer(snapshot, gc));
 
             let path = save_dated_file("states", self.gui.queue_snapshot.name(), "bin").unwrap();

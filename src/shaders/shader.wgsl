@@ -12,10 +12,8 @@ fn tick(x: u32, y: u32, mul: ptr<function, f32>, distance: ptr<function, f32>, c
 // #endif
 
 struct Context {
-    width: u32,
-    height: u32,
-    window_width: u32,
-    window_height: u32,
+    size: vec2<u32>,
+    window: vec2<u32>,
 
     tick: u32,
     ticks_per_dispatch: u32,
@@ -26,16 +24,14 @@ struct Context {
     c: f32,
     amplitude: f32,
     oscillation: f32,
-    gain: f32,
-    energy_gain: f32
 }
 
 fn index(x: u32, y: u32, n: u32) -> u32 {
-    return (ctx.width * ctx.height * n) + (y * ctx.width) + x;
+    return (ctx.size.x * ctx.size.y * n) + (y * ctx.size.x) + x;
 }
 
 fn get_map(x: u32, y: u32) -> vec4<u32> {
-    let value = map[y * ctx.width + x];
+    let value = map[y * ctx.size.x + x];
     return vec4<u32>(
         value & 0xFF,
         (value >> 8) & 0xFF,
@@ -68,17 +64,17 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         if x == 0 {
             states[ni] = states[ci] + (states[index(x + 1, y, current)] - states[ci]) * ctx.c;
             return;
-        } else if x == ctx.width - 1 {
+        } else if x == ctx.size.x - 1 {
             states[ni] = states[ci] - (states[ci] - states[index(x - 1, y, current)]) * ctx.c;
             return;
         } else if y == 0 {
             states[ni] = states[ci] + (states[index(x, y + 1, current)] - states[ci]) * ctx.c;
             return;
-        } else if y == ctx.height - 1 {
+        } else if y == ctx.size.y - 1 {
             states[ni] = states[ci] - (states[ci] - states[index(x, y - 1, current)]) * ctx.c;
             return;
         }
-    } else if x == 0 || y == 0 || x == ctx.width - 1 || y == ctx.height - 1 {
+    } else if x == 0 || y == 0 || x == ctx.size.x - 1 || y == ctx.size.y - 1 {
         states[ni] = 0.0;
         return;
     }
