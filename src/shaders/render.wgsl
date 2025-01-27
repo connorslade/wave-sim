@@ -109,13 +109,15 @@ fn sample(origin: vec2<f32>, pos: vec2<i32>) -> f32 {
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    let pos = vec2<i32>((in.position.xy - ctx.pan)  * ctx.zoom );
+    let posf = (in.position.xy - ctx.pan) * ctx.zoom;
+    let pos = vec2<i32>(posf);
 
-    if pos.x == -1 || pos.y == -1 || pos.x == i32(ctx.size.x) || pos.y == i32(ctx.size.y) {
-        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-    } else if pos.x < 0 || pos.x > i32(ctx.size.x) || pos.y < 0 || pos.y > i32(ctx.size.y) {
+    if posf.x < -ctx.zoom || posf.y < -ctx.zoom || posf.x >= f32(ctx.size.x) + ctx.zoom || posf.y >= f32(ctx.size.y) + ctx.zoom {
         return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+    } else if posf.x < 0 || posf.y < 0 || posf.x >= f32(ctx.size.x) || posf.y >= f32(ctx.size.y) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
+
 
     if (ctx.flags & 0x02) != 0 {
         var val = clamp(sample_avg_energy(in.position.xy, pos) * ctx.energy_gain, 0.0, 1.0);
