@@ -67,7 +67,7 @@ impl Gui {
 
                 let (shift, ctrl) = ui.input(|i| (i.modifiers.shift, i.modifiers.ctrl));
 
-                ui.label(format!("Size: {}x{}", size.x, size.y));
+                ui.label(format!("Domain: {}×{}", size.x, size.y));
                 ui.horizontal(|ui| {
                     ui.label(format!("FPS: {avg_fps:.1}"));
                     ui.label(format!(
@@ -77,85 +77,79 @@ impl Gui {
                 });
                 ui.label(format!("Tick: {}", simulation.tick));
 
-                let c = 0.002 * simulation.dt * simulation.v / simulation.dx;
-                ui.horizontal(|ui| {
-                    ui.label(format!("Courant: {c:.2}"));
-                    if c > 0.7 {
-                        ui.label(RichText::new("CFL not met. (c < 0.7)").color(Color32::RED))
-                            .on_hover_text(COURANT_TIP);
-                    } else if c == 0.0 {
-                        ui.label(RichText::new("C is zero.").color(Color32::RED))
-                            .on_hover_text(COURANT_TIP);
-                    }
-                });
-
                 ui.separator();
-
-                let last_target_fps = fps.target_fps;
-                ui.add(Slider::new(&mut fps.target_fps, 30..=1000).text("Target FPS"));
-
-                if last_target_fps != fps.target_fps {
-                    fps.fps_history.reset();
-                    fps.interval
-                        .set_period(Duration::from_secs_f64(1.0 / fps.target_fps as f64));
-                }
 
                 ui.add(
                     Slider::new(&mut simulation.ticks_per_dispatch, 1..=32)
                         .text("Ticks per Dispatch"),
                 );
 
-                ui.columns(2, |ui| {
-                    dragger(&mut ui[0], "Gain", &mut simulation.gain, |x| {
+                ui.separator();
+
+                ui.collapsing("Viewport", |ui| {
+                    dragger(ui, "Gain", &mut simulation.gain, |x| {
+                        x.clamp_range(0.0..=f32::MAX).speed(0.1)
+                    });
+                    dragger(ui, "Energy Gain", &mut simulation.energy_gain, |x| {
                         x.clamp_range(0.0..=f32::MAX).speed(0.1)
                     });
 
-                    dragger(
-                        &mut ui[1],
-                        "Energy Gain",
-                        &mut simulation.energy_gain,
-                        |x| x.clamp_range(0.0..=f32::MAX).speed(0.1),
+                    ui.separator();
+
+                    bit_checkbox(
+                        ui,
+                        "Energy View",
+                        &mut simulation.flags,
+                        SimulationFlags::ENERGY_VIEW,
+                    );
+                    bit_checkbox(
+                        ui,
+                        "Smooth Sampling",
+                        &mut simulation.flags,
+                        SimulationFlags::BILINIER_SAMPLING,
                     );
                 });
 
-                bit_checkbox(
-                    ui,
-                    "Reflective Boundaries",
-                    &mut simulation.flags,
-                    SimulationFlags::REFLECTIVE_BOUNDARY,
-                );
-                bit_checkbox(
-                    ui,
-                    "Energy View",
-                    &mut simulation.flags,
-                    SimulationFlags::ENERGY_VIEW,
-                );
-                bit_checkbox(
-                    ui,
-                    "Smooth Sampling",
-                    &mut simulation.flags,
-                    SimulationFlags::BILINIER_SAMPLING,
-                );
+                ui.collapsing("Simulation", |ui| {
+                    bit_checkbox(
+                        ui,
+                        "Reflective Boundaries",
+                        &mut simulation.flags,
+                        SimulationFlags::REFLECTIVE_BOUNDARY,
+                    );
 
-                ui.separator();
+                    ui.separator();
 
-                dragger(ui, "dx (m)", &mut simulation.dx, |x| {
-                    x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
-                });
-                dragger(ui, "dt (ms)", &mut simulation.dt, |x| {
-                    x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
-                });
-                dragger(ui, "Wave Speed", &mut simulation.v, |x| {
-                    x.clamp_range(0.0..=f32::MAX)
+                    dragger(ui, "dx (m)", &mut simulation.dx, |x| {
+                        x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
+                    });
+                    dragger(ui, "dt (ms)", &mut simulation.dt, |x| {
+                        x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
+                    });
+                    dragger(ui, "Wave Speed", &mut simulation.v, |x| {
+                        x.clamp_range(0.0..=f32::MAX)
+                    });
+
+                    let c = 0.002 * simulation.dt * simulation.v / simulation.dx;
+                    ui.horizontal(|ui| {
+                        ui.label(format!("Courant: {c:.2}"));
+                        if c > 0.7 {
+                            ui.label(RichText::new("CFL not met. (c < 0.7)").color(Color32::RED))
+                                .on_hover_text(COURANT_TIP);
+                        } else if c == 0.0 {
+                            ui.label(RichText::new("C is zero.").color(Color32::RED))
+                                .on_hover_text(COURANT_TIP);
+                        }
+                    });
                 });
 
-                ui.separator();
-
-                dragger(ui, "Amplitude", &mut simulation.amplitude, |x| {
-                    x.clamp_range(0.0..=f32::MAX).speed(0.001)
-                });
-                dragger(ui, "Frequency (kHz)", &mut simulation.frequency, |x| {
-                    x.clamp_range(0.1..=f32::MAX).speed(0.1)
+                ui.collapsing("Oscillator", |ui| {
+                    dragger(ui, "Amplitude", &mut simulation.amplitude, |x| {
+                        x.clamp_range(0.0..=f32::MAX).speed(0.001)
+                    });
+                    dragger(ui, "Frequency (kHz)", &mut simulation.frequency, |x| {
+                        x.clamp_range(0.1..=f32::MAX).speed(0.1)
+                    });
                 });
 
                 ui.separator();

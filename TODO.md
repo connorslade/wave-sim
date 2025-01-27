@@ -1,6 +1,7 @@
 # TODO
 
 - [x] Allow running multiple simulation steps in one compute dispatch
+- [ ] Rewrite using my compute lib?
 - [ ] Audio
   - [ ] Make pickup location configurable
   - [ ] Multiple pickups?
