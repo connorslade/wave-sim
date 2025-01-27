@@ -2,9 +2,11 @@ use std::time::{Duration, Instant};
 
 use bitflags::Flags;
 use egui::{emath::Numeric, Color32, Context, DragValue, RichText, Slider, Ui, Window};
+use nalgebra::Vector2;
 use wgpu::{Buffer, CommandEncoder};
 
 use crate::{
+    renderer::Renderer,
     simulation::{Simulation, SimulationFlags},
     FpsTracker, GraphicsContext,
 };
@@ -31,11 +33,29 @@ impl Gui {
         ctx: &Context,
         gc: &GraphicsContext,
         simulation: &mut Simulation,
+        render: &mut Renderer,
         fps: &mut FpsTracker,
     ) {
         let now = Instant::now();
         let frame_time = now - fps.last_frame;
         fps.last_frame = now;
+
+        let dragging_viewport = ctx.dragged_id().is_none();
+        let scale_factor = gc.window.scale_factor() as f32;
+
+        ctx.input(|input| {
+            let pointer = input.pointer.latest_pos().unwrap_or_default();
+            let pointer = Vector2::new(pointer.x, pointer.y) * scale_factor;
+
+            let old_zoom = render.zoom;
+            render.zoom = (old_zoom + input.smooth_scroll_delta.y / 1000.0).max(0.05);
+            render.pan += (pointer - render.pan) * (1.0 - (old_zoom / render.zoom));
+
+            if input.pointer.any_down() && dragging_viewport {
+                let delta = input.pointer.delta() * scale_factor;
+                render.pan += Vector2::new(delta.x, delta.y);
+            }
+        });
 
         Window::new("Wave Simulator")
             .default_width(0.0)

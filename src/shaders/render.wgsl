@@ -11,7 +11,10 @@ struct Context {
     // 1 << 1: energy_view
     flags: u32,
     gain: f32,
-    energy_gain: f32
+    energy_gain: f32,
+
+    pan: vec2<f32>,
+    zoom: f32,
 }
 
 // VERTEX SHADER //
@@ -19,7 +22,7 @@ struct Context {
 struct VertexOutput {
     @builtin(position)
     position: vec4<f32>,
-};
+}
 
 @vertex
 fn vert(
@@ -52,20 +55,16 @@ fn index(x: u32, y: u32, n: u32) -> u32 {
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    // ↓ Use vector operations
-    let x_offset = ctx.window.x / 2 - ctx.size.x / 2;
-    let y_offset = ctx.window.y / 2 - ctx.size.y / 2;
-    let x = i32(in.position.x) - i32(x_offset);
-    let y = i32(in.position.y) - i32(y_offset);
+    let pos = vec2<i32>((in.position.xy - ctx.pan)  * ctx.zoom );
 
-    if x == -1 || y == -1 || x == i32(ctx.size.x) || y == i32(ctx.size.y) {
+    if pos.x == -1 || pos.y == -1 || pos.x == i32(ctx.size.x) || pos.y == i32(ctx.size.y) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-    } else if x < 0 || x > i32(ctx.size.x) || y < 0 || y > i32(ctx.size.y) {
+    } else if pos.x < 0 || pos.x > i32(ctx.size.x) || pos.y < 0 || pos.y > i32(ctx.size.y) {
         return vec4<f32>(1.0, 1.0, 1.0, 1.0);
     }
 
     if (ctx.flags & 0x02) != 0 {
-        var val = clamp(average_energy[u32(y) * ctx.size.x + u32(x)] * ctx.energy_gain, 0.0, 1.0);
+        var val = clamp(average_energy[u32(pos.y) * ctx.size.x + u32(pos.x)] * ctx.energy_gain, 0.0, 1.0);
         let scheme_index = u32(val * 3.0);
         val = val * 3.0 - f32(scheme_index);
 
@@ -86,7 +85,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(color, 1.0);
     }
 
-    let val = states[index(u32(x), u32(y), ctx.tick % 3)] * ctx.gain;
+    let val = states[index(u32(pos.x), u32(pos.y), ctx.tick % 3)] * ctx.gain;
     let color = (
           vec3<f32>(0.0, 0.0, 1.0) * f32(val > 0.0)
         + vec3<f32>(1.0, 0.0, 0.0) * f32(val < 0.0)

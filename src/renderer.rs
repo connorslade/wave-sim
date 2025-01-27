@@ -1,5 +1,3 @@
-use std::mem;
-
 use anyhow::Result;
 use encase::{ShaderType, UniformBuffer};
 use image::{GenericImageView, ImageBuffer, Rgba};
@@ -26,6 +24,7 @@ pub struct Renderer {
     context: Buffer,
 
     pub pan: Vector2<f32>,
+    pub zoom: f32,
 }
 
 #[derive(ShaderType, Default)]
@@ -37,6 +36,9 @@ pub struct RenderContext {
     flags: u32,
     gain: f32,
     energy_gain: f32,
+
+    pan: Vector2<f32>,
+    zoom: f32,
 }
 
 impl Renderer {
@@ -78,9 +80,7 @@ impl Renderer {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(
-                            dbg!(mem::size_of::<RenderContext>()) as _
-                        ),
+                        min_binding_size: BufferSize::new(48),
                     },
                     count: None,
                 },
@@ -138,6 +138,7 @@ impl Renderer {
             context,
 
             pan: Vector2::zeros(),
+            zoom: 1.0,
         }
     }
 
@@ -177,6 +178,8 @@ impl Renderer {
                 // TODO: move out of simulation
                 gain: app.simulation.gain,
                 energy_gain: app.simulation.energy_gain,
+                pan: self.pan,
+                zoom: self.zoom,
             })
             .unwrap();
         gc.queue

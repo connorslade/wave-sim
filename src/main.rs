@@ -188,7 +188,13 @@ impl App<'_> {
 
         self.renderer.render(self, &mut encoder, &view);
         self.egui.render(gc, &mut encoder, &view, |ctx| {
-            self.gui.ui(ctx, gc, &mut self.simulation, &mut self.fps);
+            self.gui.ui(
+                ctx,
+                gc,
+                &mut self.simulation,
+                &mut self.renderer,
+                &mut self.fps,
+            );
         });
 
         let snapshot = self
