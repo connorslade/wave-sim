@@ -120,14 +120,14 @@ impl Gui {
 
                     ui.separator();
 
-                    dragger(ui, "dx (m)", &mut simulation.dx, |x| {
-                        x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
+                    sci_dragger(ui, "dx (m)", &mut simulation.dx, |x| {
+                        x //.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
                     });
-                    dragger(ui, "dt (ms)", &mut simulation.dt, |x| {
-                        x.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
+                    sci_dragger(ui, "dt (ms)", &mut simulation.dt, |x| {
+                        x //.clamp_range(0.0..=f32::MAX).fixed_decimals(4).speed(0.001)
                     });
-                    dragger(ui, "Wave Speed", &mut simulation.v, |x| {
-                        x.clamp_range(0.0..=f32::MAX)
+                    sci_dragger(ui, "Wave Speed", &mut simulation.v, |x| {
+                        x //.clamp_range(0.0..=f32::MAX)
                     });
 
                     let c = 0.002 * simulation.dt * simulation.v / simulation.dx;
@@ -223,6 +223,18 @@ fn dragger<Num: Numeric>(
     });
 }
 
+fn sci_dragger<Num: Numeric>(
+    ui: &mut Ui,
+    label: &str,
+    value: &mut Num,
+    func: fn(SciDragValue<Num>) -> SciDragValue<Num>,
+) {
+    ui.horizontal(|ui| {
+        func(SciDragValue::new(value)).show(ui);
+        ui.label(label);
+    });
+}
+
 fn bit_checkbox<Value: Flags + Copy>(ui: &mut Ui, label: &str, value: &mut Value, flag: Value) {
     let mut bool_value = value.contains(flag);
     ui.checkbox(&mut bool_value, label);
@@ -248,5 +260,46 @@ impl SnapshotType {
             SnapshotType::Energy => simulation.stage_energy(encoder),
             SnapshotType::None => return None,
         })
+    }
+}
+
+struct SciDragValue<'a, Num: Numeric> {
+    value: &'a mut Num,
+    signifacant_figures: u8,
+}
+
+impl<'a, Num: Numeric> SciDragValue<'a, Num> {
+    pub fn new(value: &'a mut Num) -> Self {
+        Self {
+            value,
+            signifacant_figures: 3,
+        }
+    }
+
+    pub fn new_with_figs(value: &'a mut Num, signifacant_figures: u8) -> Self {
+        Self {
+            value,
+            signifacant_figures,
+        }
+    }
+
+    pub fn show(self, ui: &mut Ui) {
+        let initial_value = self.value.to_f64();
+        let exponent = (initial_value.abs().log10().floor()) as i32;
+        let speed = 10.0_f64.powi(exponent - (self.signifacant_figures as i32 - 1));
+
+        ui.add(
+            DragValue::new(self.value)
+                .custom_formatter(|val, _| {
+                    let exponent = (val.abs().log10().floor()) as i32;
+                    let significand = val / f64::powi(10.0, exponent);
+
+                    format!(
+                        "{significand:.00$}×10^{exponent}",
+                        self.signifacant_figures as usize - 1
+                    )
+                })
+                .speed(speed),
+        );
     }
 }
