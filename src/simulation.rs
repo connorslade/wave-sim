@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    f32::consts::PI,
+    f32::consts::TAU,
     fs::{self, File},
 };
 
@@ -295,10 +295,9 @@ impl Simulation {
             ticks_per_dispatch: self.ticks_per_dispatch,
             flags: self.flags.bits(),
 
-            // ↓ bad!
-            c: 0.002 * self.dt * self.v / self.dx,
+            c: self.v * (self.dt / self.dx),
             amplitude: self.amplitude,
-            frequency: 0.0002 * PI * self.dt / (self.frequency * 1000.0).recip(),
+            frequency: TAU * self.dt * self.frequency,
         };
 
         device.create_buffer_init(&BufferInitDescriptor {

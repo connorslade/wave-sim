@@ -3,8 +3,8 @@ reflective_boundary = false
 
 shader = "shader.wgsl"
 
-dx = 1e-7
-dt = 1.16e-13
+dx = 5e-6
+dt = 1.16e-14
 
 v = 299_792_458
 amplitude = 5e-2

@@ -11,6 +11,9 @@ fn tick(x: u32, y: u32, mul: ptr<function, f32>, distance: ptr<function, f32>, c
 @group(0) @binding(5) var<storage, read_write> audio_out: array<f32>;
 // #endif
 
+const PI: f32 = 3.14159265358979323846264338327950288;
+const TAU: f32 = 2.0 * PI;
+
 struct Context {
     size: vec2<u32>,
     window: vec2<u32>,
@@ -91,7 +94,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     states[ni] *= mul;
 
     // #if OSCILLATOR
-    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.frequency);
+    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos((f32(ctx.tick) * ctx.frequency) % TAU);
     // #endif
 
     // #if AUDIO
