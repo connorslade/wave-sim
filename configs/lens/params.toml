@@ -2,14 +2,14 @@
 size = [1440, 900]
 reflective_boundary = false
 
+map = "1440x900/map.png"
 # map = "1440x900/axicon-map.png"
 # map = "1440x900/fresnel-map.png"
 # map = "1440x900/gradient-index-map.png"
-map = "1440x900/map.png"
 
-dx = 0.05
-dt = 0.04
+dx = 5e-8
+dt = 4e-10
 
-v = 340.29
+v = 340_290_000
 amplitude = 0.03
-frequency = 4.0
+frequency = 4e14

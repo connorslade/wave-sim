@@ -23,7 +23,7 @@ struct Context {
 
     c: f32,
     amplitude: f32,
-    oscillation: f32,
+    frequency: f32,
 }
 
 fn index(x: u32, y: u32, n: u32) -> u32 {
@@ -91,7 +91,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     states[ni] *= mul;
 
     // #if OSCILLATOR
-    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.oscillation);
+    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos(f32(ctx.tick) * ctx.frequency);
     // #endif
 
     // #if AUDIO
@@ -103,5 +103,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // #endif
 
     let nd = f32(tick) + 1.0;
-    average_energy[index(x, y, 0u)] = average_energy[index(x, y, 0u)] * (f32(tick) / nd) + pow(states[ni], 2.0) / nd;
+    average_energy[index(x, y, 0u)] *= (f32(tick) / nd) + pow(states[ni], 2.0) / nd;
 }

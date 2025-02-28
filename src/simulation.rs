@@ -295,6 +295,7 @@ impl Simulation {
             ticks_per_dispatch: self.ticks_per_dispatch,
             flags: self.flags.bits(),
 
+            // ↓ bad!
             c: 0.002 * self.dt * self.v / self.dx,
             amplitude: self.amplitude,
             frequency: 0.0002 * PI * self.dt / (self.frequency * 1000.0).recip(),
