@@ -9,7 +9,7 @@
   - [ ] Allow audio in/out without the other
   - [ ] Configurable sample rates
   - [ ] Configurable pause points
-- [ ] Change wavespeed with light wavelength. See [Sellmeier equation](https://en.wikipedia.org/wiki/Sellmeier_equation):
+- [ ] Change wavespeed with light wavelength. See [Sellmeier equation](https://en.wikipedia.org/wiki/Sellmeier_equation)
 - [ ] Update other configs to use correct units
 
 ```plain

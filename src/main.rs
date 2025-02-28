@@ -1,9 +1,11 @@
 use std::{fs, sync::Arc, time::Instant};
 
 use anyhow::{Context, Result};
-use egui::Egui;
 use image::ImageFormat;
-use ui::{Gui, SnapshotType};
+use ui::{
+    egui::Egui,
+    interface::{Gui, SnapshotType},
+};
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
     Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
@@ -18,7 +20,6 @@ use winit::{
 };
 
 mod config;
-mod egui;
 mod misc;
 mod renderer;
 mod simulation;
