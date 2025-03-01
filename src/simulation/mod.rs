@@ -30,6 +30,9 @@ use crate::{
 
 const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, mul: ptr<function, f32>, distance: ptr<function, f32>, c: ptr<function, f32>)";
 
+pub mod snapshot;
+use snapshot::SnapshotType;
+
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
     size: Vector2<u32>,
@@ -42,7 +45,11 @@ pub struct Simulation {
     script: Option<Scripting>,
 
     pub queue_snapshot: SnapshotType,
+    pub parameters: SimulationParameters,
+}
 
+#[derive(Clone)]
+pub struct SimulationParameters {
     pub ticks_per_dispatch: u32,
     pub tick: u64,
     pub running: bool,
@@ -54,8 +61,6 @@ pub struct Simulation {
 
     pub amplitude: f32,
     pub frequency: f32,
-    pub gain: f32,
-    pub energy_gain: f32,
 }
 
 bitflags! {
@@ -69,22 +74,16 @@ bitflags! {
 
 #[derive(ShaderType)]
 pub struct SimulationContext {
-    size: Vector2<u32>,
-    window: Vector2<u32>,
+    pub size: Vector2<u32>,
+    pub window: Vector2<u32>,
 
-    tick: u32,
-    ticks_per_dispatch: u32,
-    flags: u32,
+    pub tick: u32,
+    pub ticks_per_dispatch: u32,
+    pub flags: u32,
 
-    c: f32,
-    amplitude: f32,
-    frequency: f32,
-}
-
-pub enum SnapshotType {
-    None,
-    State,
-    Energy,
+    pub c: f32,
+    pub amplitude: f32,
+    pub frequency: f32,
 }
 
 impl Simulation {
@@ -121,7 +120,7 @@ impl Simulation {
             .as_ref()
             .map(|x| Scripting::from_file(config.base_path().join(x)));
 
-        let mut raw_shader = Cow::Borrowed(include_str!("shaders/shader.wgsl"));
+        let mut raw_shader = Cow::Borrowed(include_str!("../shaders/shader.wgsl"));
         if let Some(ref shader) = config.shader {
             let shader = fs::read_to_string(config.base_path().join(shader)).unwrap();
             let line_end = raw_shader.find('\n').unwrap();
@@ -202,20 +201,19 @@ impl Simulation {
             script,
 
             queue_snapshot: SnapshotType::None,
+            parameters: SimulationParameters {
+                ticks_per_dispatch: 1,
+                tick: 0,
+                running: false,
+                flags,
 
-            ticks_per_dispatch: 1,
-            tick: 0,
-            running: false,
-            flags,
+                dt: config.parameters.dt,
+                dx: config.parameters.dx,
 
-            dt: config.parameters.dt,
-            dx: config.parameters.dx,
-
-            v: config.parameters.v,
-            amplitude: config.oscillator.amplitude,
-            frequency: config.oscillator.frequency,
-            gain: 1.0,
-            energy_gain: 1.0,
+                v: config.parameters.v,
+                amplitude: config.oscillator.amplitude,
+                frequency: config.oscillator.frequency,
+            },
         })
     }
 
@@ -237,13 +235,14 @@ impl Simulation {
         encoder: &mut CommandEncoder,
         window_size: PhysicalSize<u32>,
     ) {
-        if !self.running {
+        if !self.parameters.running {
             return;
         }
 
-        for _ in 0..self.ticks_per_dispatch {
+        for _ in 0..self.parameters.ticks_per_dispatch {
             let buf = self.get_context_buffer(&gc.device, window_size);
 
+            let params = &mut self.parameters;
             let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
             let mut entries = vec![
                 BindGroupEntry {
@@ -293,18 +292,17 @@ impl Simulation {
             drop(compute_pass);
 
             if let Some(audio) = &mut self.audio {
-                match audio.audio_in_len.cmp(&(self.tick as usize)) {
-                    Ordering::Equal => self.running = false,
-                    Ordering::Greater => audio.tick(self.tick, gc, encoder),
+                match audio.audio_in_len.cmp(&(params.tick as usize)) {
+                    Ordering::Equal => params.running = false,
+                    Ordering::Greater => audio.tick(params.tick, gc, encoder),
                     _ => {}
                 }
             }
 
-            self.tick += 1;
+            params.tick += 1;
 
             if let Some(script) = &mut self.script {
-                let response = script.post_tick(self.tick, self.running);
-                self.running = response.running;
+                let response = script.post_tick(params);
 
                 if response.reset {
                     self.reset_states(&gc.queue);
@@ -321,17 +319,18 @@ impl Simulation {
     }
 
     pub fn get_context_buffer(&self, device: &Device, window_size: PhysicalSize<u32>) -> Buffer {
+        let params = &self.parameters;
         let context = SimulationContext {
             size: self.size,
             window: Vector2::new(window_size.width, window_size.height),
 
-            tick: self.tick as u32,
-            ticks_per_dispatch: self.ticks_per_dispatch,
-            flags: self.flags.bits(),
+            tick: params.tick as u32,
+            ticks_per_dispatch: params.ticks_per_dispatch,
+            flags: params.flags.bits(),
 
-            c: self.v * (self.dt / self.dx),
-            amplitude: self.amplitude,
-            frequency: TAU * self.dt * self.frequency,
+            c: params.v * (params.dt / params.dx),
+            amplitude: params.amplitude,
+            frequency: TAU * params.dt * params.frequency,
         };
 
         device.create_buffer_init(&BufferInitDescriptor {
@@ -339,18 +338,6 @@ impl Simulation {
             contents: &context.to_wgsl_bytes(),
             usage: BufferUsages::UNIFORM,
         })
-    }
-
-    pub fn stage_state(&self, encoder: &mut CommandEncoder) -> &Buffer {
-        let offset = (self.tick % 3) * (self.size.x * self.size.y * 4) as u64;
-        encoder.copy_buffer_to_buffer(
-            &self.states,
-            offset,
-            &self.staging_buffer,
-            0,
-            self.staging_buffer.size(),
-        );
-        &self.staging_buffer
     }
 
     pub fn stage_energy(&self, encoder: &mut CommandEncoder) -> &Buffer {
@@ -365,7 +352,7 @@ impl Simulation {
     }
 
     pub fn reset_states(&mut self, queue: &Queue) {
-        self.tick = 0;
+        self.parameters.tick = 0;
         let empty_buffer = vec![0f32; (self.size.x * self.size.y * 3) as usize];
         queue.write_buffer(
             &self.states,
@@ -385,31 +372,9 @@ impl Simulation {
 }
 
 impl SimulationContext {
-    fn to_wgsl_bytes(&self) -> Vec<u8> {
+    pub fn to_wgsl_bytes(&self) -> Vec<u8> {
         let mut buffer = encase::UniformBuffer::new(Vec::new());
         buffer.write(self).unwrap();
         buffer.into_inner()
-    }
-}
-
-impl SnapshotType {
-    pub fn name(&self) -> &'static str {
-        match self {
-            SnapshotType::None => "none",
-            SnapshotType::State => "state",
-            SnapshotType::Energy => "energy",
-        }
-    }
-
-    pub fn stage<'a>(
-        &self,
-        simulation: &'a Simulation,
-        encoder: &mut CommandEncoder,
-    ) -> Option<&'a Buffer> {
-        Some(match self {
-            SnapshotType::State => simulation.stage_state(encoder),
-            SnapshotType::Energy => simulation.stage_energy(encoder),
-            SnapshotType::None => return None,
-        })
     }
 }

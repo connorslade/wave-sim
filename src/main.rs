@@ -89,11 +89,11 @@ async fn main() -> Result<()> {
                     event,
                     is_synthetic: _,
                 } if event.state.is_pressed() => {
-                    app.simulation.running ^=
-                        event.physical_key == PhysicalKey::Code(KeyCode::Space);
+                    let params = &mut app.simulation.parameters;
+                    params.running ^= event.physical_key == PhysicalKey::Code(KeyCode::Space);
 
                     if event.physical_key == PhysicalKey::Code(KeyCode::KeyE) {
-                        app.simulation.flags.toggle(SimulationFlags::ENERGY_VIEW);
+                        params.flags.toggle(SimulationFlags::ENERGY_VIEW);
                     }
 
                     if event.physical_key == PhysicalKey::Code(KeyCode::KeyR) {

@@ -7,7 +7,7 @@ use nalgebra::Vector2;
 use crate::{
     misc::RingBuffer,
     renderer::Renderer,
-    simulation::{Simulation, SimulationFlags, SnapshotType},
+    simulation::{snapshot::SnapshotType, Simulation, SimulationFlags},
     GraphicsContext,
 };
 
@@ -67,41 +67,41 @@ impl Gui {
 
                 let (shift, ctrl) = ui.input(|i| (i.modifiers.shift, i.modifiers.ctrl));
 
+                let params = &mut simulation.parameters;
                 ui.label(format!("Domain: {}×{}", size.x, size.y));
                 ui.horizontal(|ui| {
                     ui.label(format!("FPS: {avg_fps:.1}"));
                     ui.label(format!(
                         "UPS: {:.1}",
-                        avg_fps * simulation.ticks_per_dispatch as f64
+                        avg_fps * params.ticks_per_dispatch as f64
                     ));
                 });
-                ui.label(format!("Tick: {}", simulation.tick));
+                ui.label(format!("Tick: {}", params.tick));
 
                 ui.separator();
 
                 ui.add(
-                    Slider::new(&mut simulation.ticks_per_dispatch, 1..=32)
-                        .text("Ticks per Dispatch"),
+                    Slider::new(&mut params.ticks_per_dispatch, 1..=32).text("Ticks per Dispatch"),
                 );
 
                 ui.separator();
 
                 ui.collapsing("Viewport", |ui| {
-                    sci_dragger(ui, "Gain", &mut simulation.gain);
-                    sci_dragger(ui, "Energy Gain", &mut simulation.energy_gain);
+                    sci_dragger(ui, "Gain", &mut render.gain);
+                    sci_dragger(ui, "Energy Gain", &mut render.energy_gain);
 
                     ui.separator();
 
                     bit_checkbox(
                         ui,
                         "Energy View",
-                        &mut simulation.flags,
+                        &mut params.flags,
                         SimulationFlags::ENERGY_VIEW,
                     );
                     bit_checkbox(
                         ui,
                         "Smooth Sampling",
-                        &mut simulation.flags,
+                        &mut params.flags,
                         SimulationFlags::BILINIER_SAMPLING,
                     );
                 });
@@ -110,17 +110,17 @@ impl Gui {
                     bit_checkbox(
                         ui,
                         "Reflective Boundaries",
-                        &mut simulation.flags,
+                        &mut params.flags,
                         SimulationFlags::REFLECTIVE_BOUNDARY,
                     );
 
                     ui.separator();
 
-                    sci_dragger(ui, "dx (m)", &mut simulation.dx);
-                    sci_dragger(ui, "dt (s)", &mut simulation.dt);
-                    sci_dragger(ui, "Wave Speed (m/s)", &mut simulation.v);
+                    sci_dragger(ui, "dx (m)", &mut params.dx);
+                    sci_dragger(ui, "dt (s)", &mut params.dt);
+                    sci_dragger(ui, "Wave Speed (m/s)", &mut params.v);
 
-                    let c = simulation.dt * simulation.v / simulation.dx;
+                    let c = params.dt * params.v / params.dx;
                     ui.horizontal(|ui| {
                         ui.label(format!("Courant: {c:.2}"));
                         if c > 0.7 {
@@ -134,16 +134,17 @@ impl Gui {
                 });
 
                 ui.collapsing("Oscillator", |ui| {
-                    sci_dragger(ui, "Amplitude", &mut simulation.amplitude);
-                    sci_dragger(ui, "Frequency (Hz)", &mut simulation.frequency);
+                    sci_dragger(ui, "Amplitude", &mut params.amplitude);
+                    sci_dragger(ui, "Frequency (Hz)", &mut params.frequency);
                 });
 
                 ui.separator();
 
                 ui.horizontal(|ui| {
-                    simulation.running ^= ui
-                        .button(if simulation.running { "⏸" } else { "▶" })
-                        .on_hover_text(if simulation.running {
+                    let running = &mut simulation.parameters.running;
+                    *running ^= ui
+                        .button(if *running { "⏸" } else { "▶" })
+                        .on_hover_text(if *running {
                             "Pause simulation (Space)"
                         } else {
                             "Resume simulation (Space)"

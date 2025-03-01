@@ -25,6 +25,8 @@ pub struct Renderer {
 
     pub pan: Vector2<f32>,
     pub zoom: f32,
+    pub gain: f32,
+    pub energy_gain: f32,
 }
 
 #[derive(ShaderType, Default)]
@@ -139,6 +141,8 @@ impl Renderer {
 
             pan: Vector2::zeros(),
             zoom: 1.0,
+            gain: 1.0,
+            energy_gain: 1.0,
         }
     }
 
@@ -172,12 +176,11 @@ impl Renderer {
             .write(&RenderContext {
                 size: app.simulation.get_size(),
                 window: Vector2::new(window.width, window.height),
-                tick: app.simulation.tick as u32,
-                flags: app.simulation.flags.bits(),
+                tick: app.simulation.parameters.tick as u32,
+                flags: app.simulation.parameters.flags.bits(),
 
-                // TODO: move out of simulation
-                gain: app.simulation.gain,
-                energy_gain: app.simulation.energy_gain,
+                gain: self.gain,
+                energy_gain: self.energy_gain,
                 pan: self.pan,
                 zoom: self.zoom.powi(2),
             })
