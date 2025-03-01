@@ -95,7 +95,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     states[ni] *= mul;
 
     // #if OSCILLATOR
-    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos((f32(ctx.tick) * ctx.frequency) % TAU);
+    states[ni] += ctx.amplitude * exp(-abs(distance)) * cos((f32(tick) * ctx.frequency) % TAU);
     // #endif
 
     // #if AUDIO
@@ -107,5 +107,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // #endif
 
     let nd = f32(tick) + 1.0;
-    average_energy[index(x, y, 0u)] *= (f32(tick) / nd) + pow(states[ni], 2.0) / nd;
+    average_energy[index(x, y, 0u)] = average_energy[index(x, y, 0u)] * (f32(tick) / nd) + pow(states[ni], 2.0) / nd;
 }

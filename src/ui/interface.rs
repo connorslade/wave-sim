@@ -170,9 +170,9 @@ impl Gui {
                         .clicked()
                     {
                         if shift {
-                            simulation.queue_snapshot = SnapshotType::State;
+                            simulation.snapshot.push(SnapshotType::State, None);
                         } else if ctrl {
-                            simulation.queue_snapshot = SnapshotType::Energy;
+                            simulation.snapshot.push(SnapshotType::Energy, None);
                         } else {
                             self.queue_screenshot = true;
                         }

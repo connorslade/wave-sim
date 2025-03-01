@@ -1,4 +1,4 @@
-use std::{fs, mem, sync::Arc};
+use std::{fs, mem, path::Path, sync::Arc};
 
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, PresentMode, Queue, Surface,
@@ -52,10 +52,23 @@ impl App<'_> {
                 .ui(ctx, gc, &mut self.simulation, &mut self.renderer);
         });
 
-        let snapshot = self
-            .simulation
-            .queue_snapshot
-            .stage(&self.simulation, &mut encoder);
+        while let Some((snapshot, name)) = self.simulation.snapshot.pop() {
+            let buffer = snapshot.stage(&self.simulation, &mut encoder);
+
+            let mut data = Vec::with_capacity(8 + buffer.size() as usize);
+            let size = self.simulation.get_size();
+            data.extend_from_slice(&size.x.to_le_bytes());
+            data.extend_from_slice(&size.y.to_le_bytes());
+            data.extend_from_slice(&download_buffer(buffer, gc));
+
+            let path = if let Some(name) = name {
+                Path::new("states").join(name).to_path_buf()
+            } else {
+                save_dated_file("states", snapshot.name(), "bin").unwrap()
+            };
+
+            fs::write(path, data).unwrap();
+        }
 
         gc.queue.submit([encoder.finish()]);
 
@@ -66,20 +79,6 @@ impl App<'_> {
             if let Err(e) = self.renderer.screenshot(self) {
                 eprintln!("Failed to take screenshot: {:?}", e);
             }
-        }
-
-        if let Some(snapshot) = snapshot {
-            let mut data = Vec::with_capacity(8 + snapshot.size() as usize);
-            let size = self.simulation.get_size();
-            data.extend_from_slice(&size.x.to_le_bytes());
-            data.extend_from_slice(&size.y.to_le_bytes());
-            data.extend_from_slice(&download_buffer(snapshot, gc));
-
-            let path =
-                save_dated_file("states", self.simulation.queue_snapshot.name(), "bin").unwrap();
-            fs::write(path, data).unwrap();
-
-            self.simulation.queue_snapshot = SnapshotType::None;
         }
     }
 

@@ -24,14 +24,15 @@ use crate::{
         audio::Audio,
         preprocess::{Data, Preprocessor},
     },
-    scripting::Scripting,
     GraphicsContext,
 };
 
 const TICK_SIGNATURE: &str = "fn tick(x: u32, y: u32, mul: ptr<function, f32>, distance: ptr<function, f32>, c: ptr<function, f32>)";
 
+mod scripting;
 pub mod snapshot;
-use snapshot::SnapshotType;
+use scripting::Scripting;
+use snapshot::SnapshotQueue;
 
 pub struct Simulation {
     compute_pipeline: ComputePipeline,
@@ -44,7 +45,7 @@ pub struct Simulation {
     audio: Option<Audio>,
     script: Option<Scripting>,
 
-    pub queue_snapshot: SnapshotType,
+    pub snapshot: SnapshotQueue,
     pub parameters: SimulationParameters,
 }
 
@@ -191,7 +192,7 @@ impl Simulation {
             flags |= SimulationFlags::REFLECTIVE_BOUNDARY;
         }
 
-        Ok(Self {
+        let mut this = Self {
             compute_pipeline,
             size: Vector2::new(config.size.0, config.size.1),
 
@@ -202,7 +203,7 @@ impl Simulation {
             audio,
             script,
 
-            queue_snapshot: SnapshotType::None,
+            snapshot: Default::default(),
             parameters: SimulationParameters {
                 ticks_per_dispatch: 1,
                 tick: 0,
@@ -217,7 +218,10 @@ impl Simulation {
                 amplitude: config.oscillator.amplitude,
                 frequency: config.oscillator.frequency,
             },
-        })
+        };
+
+        this.script_update(None, "init");
+        Ok(this)
     }
 
     pub fn get_state(&self) -> &Buffer {
@@ -240,10 +244,6 @@ impl Simulation {
     ) {
         if !self.parameters.running {
             return;
-        }
-
-        if self.parameters.tick == 0 {
-            self.script_update(gc);
         }
 
         for _ in 0..self.parameters.ticks_per_dispatch {
@@ -307,24 +307,20 @@ impl Simulation {
             }
 
             params.tick += 1;
-            self.script_update(gc);
+            self.script_update(Some(&gc.queue), "update");
         }
     }
 
-    fn script_update(&mut self, gc: &GraphicsContext) {
+    fn script_update(&mut self, queue: Option<&Queue>, func: &str) {
         if let Some(script) = &mut self.script {
-            let response = script.update(&mut self.parameters);
+            let response = script.update(&mut self.parameters, func);
 
-            if response.reset {
-                self.reset_states(&gc.queue);
-                self.reset_average_energy(&gc.queue);
+            if let (Some(queue), true) = (queue, response.reset) {
+                self.reset_states(&queue);
+                self.reset_average_energy(&queue);
             }
 
-            self.queue_snapshot = response
-                .snapshot_state
-                .then_some(SnapshotType::Energy)
-                .or(response.snapshot_energy.then_some(SnapshotType::Energy))
-                .unwrap_or(SnapshotType::None);
+            self.snapshot.extend(response.snapshot);
         }
     }
 

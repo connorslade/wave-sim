@@ -1,7 +1,7 @@
 using Images
 using Colors
 
-STATE_PATH = "states/biconvex-lens"
+STATE_PATH = "states"
 
 WIDTH = 1440
 HEIGHT = 900
@@ -21,11 +21,11 @@ for state in states
 
     println("Processing $(state)...")
 
-    frequency = parse(Float64, state[1:length(state) - 4]) * 100 # in THz
-    color = RGB(colormatch(299792.458 / frequency))
+    wavelength = parse(Float64, state[4:6])
+    color = RGB(colormatch(wavelength))
 
     state = clamp.(load_state(state), 0, 1)
-    colored_state = RGB.(state .* color.r, state .* color.g, state .* color.b)
+    colored_state = RGB.(state .* color.r, state .* color.g, state .* color.b) / 79.0 * 10.0
 
     for x in 1:WIDTH
         for y in 1:HEIGHT

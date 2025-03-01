@@ -1,8 +1,10 @@
 use std::{mem, path::PathBuf};
 
-use rhai::{Dynamic, Engine, Scope, AST, INT};
+use rhai::{Dynamic, Engine, OptimizationLevel, Scope, AST, INT};
 
 use crate::simulation::SimulationParameters;
+
+use super::snapshot::SnapshotType;
 
 pub struct Scripting {
     engine: Engine,
@@ -17,23 +19,27 @@ struct Context {
     response: PostTickResponse,
 }
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct PostTickResponse {
     pub reset: bool,
-    pub snapshot_state: bool,
-    pub snapshot_energy: bool,
+    pub snapshot: Vec<(SnapshotType, Option<String>)>,
 }
 
 impl Scripting {
     pub fn from_file(path: PathBuf) -> Self {
         let mut engine = Engine::new();
         let mut scope = Scope::new();
+        engine.set_optimization_level(OptimizationLevel::None);
         engine
+            .register_fn("pow", f64::powf)
+            .register_fn("sqrt", f64::sqrt)
             .register_type::<Context>()
             .register_get("tick", Context::get_tick)
             .register_fn("pause", Context::pause)
             .register_fn("reset", Context::reset)
+            .register_fn("snapshot_state", Context::snapshot_state_name)
             .register_fn("snapshot_state", Context::snapshot_state)
+            .register_fn("snapshot_energy", Context::snapshot_energy_name)
             .register_fn("snapshot_energy", Context::snapshot_energy)
             .register_set("user", Context::set_user)
             .register_get_set("v", Context::get_v, Context::set_v)
@@ -42,7 +48,7 @@ impl Scripting {
             .register_get_set("amplitude", Context::get_amplitude, Context::set_amplitude)
             .register_get_set("frequency", Context::get_frequency, Context::set_frequency);
 
-        let script = engine.compile_file(path).unwrap();
+        let script = engine.compile_file_with_scope(&scope, path).unwrap();
         engine.run_ast_with_scope(&mut scope, &script).unwrap();
 
         Self {
@@ -52,7 +58,7 @@ impl Scripting {
         }
     }
 
-    pub fn update(&mut self, params: &mut SimulationParameters) -> PostTickResponse {
+    pub fn update(&mut self, params: &mut SimulationParameters, func: &str) -> PostTickResponse {
         let ctx = Context {
             params: params.clone(),
             response: PostTickResponse::default(),
@@ -60,7 +66,7 @@ impl Scripting {
 
         self.scope.set_value("sim", ctx);
         self.engine
-            .call_fn::<()>(&mut self.scope, &self.script, "update", ())
+            .call_fn::<()>(&mut self.scope, &self.script, func, ())
             .unwrap();
 
         let ctx = self.scope.get_value::<Context>("sim").unwrap();
@@ -83,11 +89,23 @@ impl Context {
     }
 
     fn snapshot_state(&mut self) {
-        self.response.snapshot_state = true;
+        self.response.snapshot.push((SnapshotType::State, None));
+    }
+
+    fn snapshot_state_name(&mut self, name: &str) {
+        self.response
+            .snapshot
+            .push((SnapshotType::State, Some(name.to_string())));
     }
 
     fn snapshot_energy(&mut self) {
-        self.response.snapshot_energy = true;
+        self.response.snapshot.push((SnapshotType::Energy, None));
+    }
+
+    fn snapshot_energy_name(&mut self, name: &str) {
+        self.response
+            .snapshot
+            .push((SnapshotType::Energy, Some(name.to_string())));
     }
 
     fn set_user(&mut self, user: Dynamic) {

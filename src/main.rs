@@ -17,7 +17,6 @@ mod app;
 mod config;
 mod misc;
 mod renderer;
-mod scripting;
 mod simulation;
 mod ui;
 use renderer::Renderer;

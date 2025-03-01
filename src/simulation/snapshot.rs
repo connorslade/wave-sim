@@ -2,16 +2,20 @@ use wgpu::{Buffer, CommandEncoder};
 
 use super::Simulation;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotType {
-    None,
     State,
     Energy,
+}
+
+#[derive(Default)]
+pub struct SnapshotQueue {
+    snapshots: Vec<(SnapshotType, Option<String>)>,
 }
 
 impl SnapshotType {
     pub fn name(&self) -> &'static str {
         match self {
-            SnapshotType::None => "none",
             SnapshotType::State => "state",
             SnapshotType::Energy => "energy",
         }
@@ -21,12 +25,25 @@ impl SnapshotType {
         &self,
         simulation: &'a Simulation,
         encoder: &mut CommandEncoder,
-    ) -> Option<&'a Buffer> {
-        Some(match self {
+    ) -> &'a Buffer {
+        match self {
             SnapshotType::State => simulation.stage_state(encoder),
             SnapshotType::Energy => simulation.stage_energy(encoder),
-            SnapshotType::None => return None,
-        })
+        }
+    }
+}
+
+impl SnapshotQueue {
+    pub fn push(&mut self, snapshot: SnapshotType, name: Option<String>) {
+        self.snapshots.push((snapshot, name));
+    }
+
+    pub fn extend(&mut self, snapshots: Vec<(SnapshotType, Option<String>)>) {
+        self.snapshots.extend(snapshots);
+    }
+
+    pub fn pop(&mut self) -> Option<(SnapshotType, Option<String>)> {
+        self.snapshots.pop()
     }
 }
 
