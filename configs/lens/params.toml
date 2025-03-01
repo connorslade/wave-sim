@@ -2,14 +2,16 @@
 size = [1440, 900]
 reflective_boundary = false
 
+script = "script.rhai"
+shader = "shader.wgsl"
 map = "1440x900/map.png"
 # map = "1440x900/axicon-map.png"
 # map = "1440x900/fresnel-map.png"
 # map = "1440x900/gradient-index-map.png"
 
-dx = 5e-8
-dt = 4e-10
+# dx = 5e-6
+# dt = 1.16e-14
 
-v = 340_290_000
-amplitude = 0.03
-frequency = 4e14
+# v = 299_792_458
+# amplitude = 5e-2
+# frequency = 4.3e14

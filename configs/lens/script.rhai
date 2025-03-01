@@ -1,9 +1,12 @@
-const TICKS = 100;
+const TICKS = 6000;
 const ITERATIONS = 10;
 
 let iter = 0;
 
-fn post_tick() {
+fn update() {
+    let wave_speed = 200_000_000.0;
+    sim.user = wave_speed * (sim.dt / sim.dx);
+
     if sim.tick >= TICKS {
         sim.snapshot_state();
         sim.reset();

@@ -54,6 +54,7 @@ pub struct SimulationParameters {
     pub tick: u64,
     pub running: bool,
     pub flags: SimulationFlags,
+    pub user: u32,
 
     pub v: f32,  // [length][time]^-1
     pub dt: f32, // [time]
@@ -76,6 +77,7 @@ bitflags! {
 pub struct SimulationContext {
     pub size: Vector2<u32>,
     pub window: Vector2<u32>,
+    pub user: u32,
 
     pub tick: u32,
     pub ticks_per_dispatch: u32,
@@ -206,6 +208,7 @@ impl Simulation {
                 tick: 0,
                 running: false,
                 flags,
+                user: 0,
 
                 dt: config.parameters.dt,
                 dx: config.parameters.dx,
@@ -237,6 +240,10 @@ impl Simulation {
     ) {
         if !self.parameters.running {
             return;
+        }
+
+        if self.parameters.tick == 0 {
+            self.script_update(gc);
         }
 
         for _ in 0..self.parameters.ticks_per_dispatch {
@@ -300,21 +307,24 @@ impl Simulation {
             }
 
             params.tick += 1;
+            self.script_update(gc);
+        }
+    }
 
-            if let Some(script) = &mut self.script {
-                let response = script.post_tick(params);
+    fn script_update(&mut self, gc: &GraphicsContext) {
+        if let Some(script) = &mut self.script {
+            let response = script.update(&mut self.parameters);
 
-                if response.reset {
-                    self.reset_states(&gc.queue);
-                    self.reset_average_energy(&gc.queue);
-                }
-
-                self.queue_snapshot = response
-                    .snapshot_state
-                    .then_some(SnapshotType::Energy)
-                    .or(response.snapshot_energy.then_some(SnapshotType::Energy))
-                    .unwrap_or(SnapshotType::None);
+            if response.reset {
+                self.reset_states(&gc.queue);
+                self.reset_average_energy(&gc.queue);
             }
+
+            self.queue_snapshot = response
+                .snapshot_state
+                .then_some(SnapshotType::Energy)
+                .or(response.snapshot_energy.then_some(SnapshotType::Energy))
+                .unwrap_or(SnapshotType::None);
         }
     }
 
@@ -323,6 +333,7 @@ impl Simulation {
         let context = SimulationContext {
             size: self.size,
             window: Vector2::new(window_size.width, window_size.height),
+            user: params.user,
 
             tick: params.tick as u32,
             ticks_per_dispatch: params.ticks_per_dispatch,

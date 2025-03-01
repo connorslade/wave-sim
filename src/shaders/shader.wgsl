@@ -17,6 +17,7 @@ const TAU: f32 = 2.0 * PI;
 struct Context {
     size: vec2<u32>,
     window: vec2<u32>,
+    user: u32,
 
     tick: u32,
     ticks_per_dispatch: u32,
@@ -53,7 +54,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var mul = f32(map_value.r == 0);
     var distance = 255.0 - f32(map_value.g);
-    var c = pow(ctx.c * (f32(map_value.b) / 255.0 * 2.0), 2.0);
+    var c = ctx.c * (f32(map_value.b) / 255.0 * 2.0);
     tick(x, y, &mul, &distance, &c);
 
     let next = tick % 3;
@@ -84,7 +85,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     states[ni] = 2.0 * states[index(x, y, current)]
         - states[index(x, y, last)]
-        + c * (
+        + pow(c, 2.0) * (
             states[index(x - 1, y, current)]
             + states[index(x + 1, y, current)]
             + states[index(x, y - 1, current)]

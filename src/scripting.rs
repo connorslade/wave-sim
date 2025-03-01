@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::{mem, path::PathBuf};
 
-use rhai::{Engine, Scope, AST, INT};
+use rhai::{Dynamic, Engine, Scope, AST, INT};
 
 use crate::simulation::SimulationParameters;
 
@@ -35,6 +35,7 @@ impl Scripting {
             .register_fn("reset", Context::reset)
             .register_fn("snapshot_state", Context::snapshot_state)
             .register_fn("snapshot_energy", Context::snapshot_energy)
+            .register_set("user", Context::set_user)
             .register_get_set("v", Context::get_v, Context::set_v)
             .register_get_set("dt", Context::get_dt, Context::set_dt)
             .register_get_set("dx", Context::get_dx, Context::set_dx)
@@ -51,7 +52,7 @@ impl Scripting {
         }
     }
 
-    pub fn post_tick(&mut self, params: &mut SimulationParameters) -> PostTickResponse {
+    pub fn update(&mut self, params: &mut SimulationParameters) -> PostTickResponse {
         let ctx = Context {
             params: params.clone(),
             response: PostTickResponse::default(),
@@ -59,7 +60,7 @@ impl Scripting {
 
         self.scope.set_value("sim", ctx);
         self.engine
-            .call_fn::<()>(&mut self.scope, &self.script, "post_tick", ())
+            .call_fn::<()>(&mut self.scope, &self.script, "update", ())
             .unwrap();
 
         let ctx = self.scope.get_value::<Context>("sim").unwrap();
@@ -87,6 +88,16 @@ impl Context {
 
     fn snapshot_energy(&mut self) {
         self.response.snapshot_energy = true;
+    }
+
+    fn set_user(&mut self, user: Dynamic) {
+        if let Ok(int) = user.as_int() {
+            self.params.user = (int as i32) as u32;
+        } else if let Ok(float) = user.as_float() {
+            self.params.user = unsafe { mem::transmute(float as f32) };
+        } else {
+            panic!("Unexpected type.")
+        }
     }
 
     fn set_v(&mut self, v: f64) {
