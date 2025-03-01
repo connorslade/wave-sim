@@ -3,8 +3,8 @@ using Colors
 
 STATE_PATH = "states"
 
-WIDTH = 1440
-HEIGHT = 900
+WIDTH = 1920
+HEIGHT = 1080
 
 function load_state(name)
 	state = read(STATE_PATH * "/" * name)
@@ -21,7 +21,7 @@ for state in states
 
     println("Processing $(state)...")
 
-    wavelength = parse(Float64, state[4:6])
+    wavelength = parse(Float64, state[4:end-6])
     color = RGB(colormatch(wavelength))
 
     state = clamp.(load_state(state), 0, 1)

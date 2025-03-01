@@ -2,8 +2,6 @@
 size = [1440, 900]
 reflective_boundary = false
 
-script = "script.rhai"
-shader = "shader.wgsl"
 map = "1440x900/map.png"
 # map = "1440x900/axicon-map.png"
 # map = "1440x900/fresnel-map.png"
