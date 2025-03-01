@@ -9,7 +9,7 @@ use winit::window::Window;
 use crate::{
     misc::util::{download_buffer, save_dated_file},
     renderer::Renderer,
-    simulation::{snapshot::SnapshotType, Simulation},
+    simulation::Simulation,
     ui::{egui::Egui, interface::Gui},
 };
 

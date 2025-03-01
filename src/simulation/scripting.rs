@@ -1,4 +1,4 @@
-use std::{mem, path::PathBuf};
+use std::path::PathBuf;
 
 use rhai::{Dynamic, Engine, OptimizationLevel, Scope, AST, INT};
 
@@ -112,7 +112,7 @@ impl Context {
         if let Ok(int) = user.as_int() {
             self.params.user = (int as i32) as u32;
         } else if let Ok(float) = user.as_float() {
-            self.params.user = unsafe { mem::transmute(float as f32) };
+            self.params.user = (float as f32).to_bits();
         } else {
             panic!("Unexpected type.")
         }

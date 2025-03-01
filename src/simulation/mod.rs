@@ -316,8 +316,8 @@ impl Simulation {
             let response = script.update(&mut self.parameters, func);
 
             if let (Some(queue), true) = (queue, response.reset) {
-                self.reset_states(&queue);
-                self.reset_average_energy(&queue);
+                self.reset_states(queue);
+                self.reset_average_energy(queue);
             }
 
             self.snapshot.extend(response.snapshot);
