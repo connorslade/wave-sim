@@ -5,37 +5,50 @@ use clap::Parser;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+#[serde(default)]
 pub struct Config {
     /// The path that shader and map files are relative to.
     pub base_path: Option<PathBuf>,
 
     /// The size of the simulation.
     pub size: (u32, u32),
-    /// Reflective Boundaries
-    pub reflective_boundary: bool,
+    /// Basic simulation parameters.
+    pub parameters: Parameters,
+    /// Oscillator parameters.
+    pub oscillator: Oscillator,
 
     /// The path to the shader file.
     pub shader: Option<PathBuf>,
-
+    /// The path to an optional rhai script
+    pub script: Option<PathBuf>,
     /// The path to an image file to use as a map.
     /// The red channel represents walls, green represents emitters, and blue represents change in c (128 is no change).
     /// Should be a lossless format like PNG.
     pub map: Option<PathBuf>,
 
+    /// Audio configuration.
+    pub audio: Option<AudioConfig>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Parameters {
     /// Time step (ms).
     pub dt: f32,
     /// Space step (mm).
     pub dx: f32,
-
-    /// Wave velocity m/s.
+    /// Wave speed m/s.
     pub v: f32,
+
+    /// Reflective Boundaries
+    pub reflective_boundary: bool,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Oscillator {
     /// Initial oscillator amplitude.
     pub amplitude: f32,
     /// Initial oscillator frequency in Hz.
     pub frequency: f32,
-
-    /// Audio configuration.
-    pub audio: Option<AudioConfig>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -69,4 +82,39 @@ pub fn parse() -> Result<Config> {
     }
 
     Ok(config)
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            base_path: None,
+            size: (1920, 1080),
+            parameters: Default::default(),
+            oscillator: Default::default(),
+            shader: None,
+            map: None,
+            script: None,
+            audio: None,
+        }
+    }
+}
+
+impl Default for Parameters {
+    fn default() -> Self {
+        Self {
+            dt: 1.16e-14,
+            dx: 5e-6,
+            v: 299_792_458.0,
+            reflective_boundary: false,
+        }
+    }
+}
+
+impl Default for Oscillator {
+    fn default() -> Self {
+        Self {
+            amplitude: 5e-2,
+            frequency: 4.3e14,
+        }
+    }
 }

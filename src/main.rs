@@ -1,11 +1,8 @@
-use std::{fs, sync::Arc, time::Instant};
+use std::{fs, mem, sync::Arc, time::Instant};
 
 use anyhow::{Context, Result};
 use image::ImageFormat;
-use ui::{
-    egui::Egui,
-    interface::{Gui, SnapshotType},
-};
+use ui::{egui::Egui, interface::Gui};
 use wgpu::{
     CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
     Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
@@ -22,6 +19,7 @@ use winit::{
 mod config;
 mod misc;
 mod renderer;
+mod scripting;
 mod simulation;
 mod ui;
 use misc::{
@@ -29,7 +27,7 @@ use misc::{
     RingBuffer,
 };
 use renderer::Renderer;
-use simulation::{Simulation, SimulationFlags};
+use simulation::{Simulation, SimulationFlags, SnapshotType};
 
 const ICON: &[u8] = include_bytes!("assets/icon.png");
 const TEXTURE_FORMAT: TextureFormat = TextureFormat::Bgra8Unorm;
@@ -111,7 +109,6 @@ async fn main() -> Result<()> {
         },
         gui: Gui {
             queue_screenshot: false,
-            queue_snapshot: SnapshotType::None,
             show_about: false,
         },
         fps: FpsTracker {
@@ -189,7 +186,7 @@ impl App<'_> {
         });
 
         let snapshot = self
-            .gui
+            .simulation
             .queue_snapshot
             .stage(&self.simulation, &mut encoder);
 
@@ -198,8 +195,7 @@ impl App<'_> {
         output.present();
         gc.window.request_redraw();
 
-        if self.gui.queue_screenshot {
-            self.gui.queue_screenshot = false;
+        if mem::take(&mut self.gui.queue_screenshot) {
             if let Err(e) = self.renderer.screenshot(self) {
                 eprintln!("Failed to take screenshot: {:?}", e);
             }
@@ -212,10 +208,11 @@ impl App<'_> {
             data.extend_from_slice(&size.y.to_le_bytes());
             data.extend_from_slice(&download_buffer(snapshot, gc));
 
-            let path = save_dated_file("states", self.gui.queue_snapshot.name(), "bin").unwrap();
+            let path =
+                save_dated_file("states", self.simulation.queue_snapshot.name(), "bin").unwrap();
             fs::write(path, data).unwrap();
 
-            self.gui.queue_snapshot = SnapshotType::None;
+            self.simulation.queue_snapshot = SnapshotType::None;
         }
     }
 

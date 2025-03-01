@@ -24,6 +24,7 @@ use crate::{
         audio::Audio,
         preprocess::{Data, Preprocessor},
     },
+    scripting::Scripting,
     GraphicsContext,
 };
 
@@ -38,6 +39,9 @@ pub struct Simulation {
     average_energy_buffer: Buffer,
     staging_buffer: Buffer,
     audio: Option<Audio>,
+    script: Option<Scripting>,
+
+    pub queue_snapshot: SnapshotType,
 
     pub ticks_per_dispatch: u32,
     pub tick: u64,
@@ -77,6 +81,12 @@ pub struct SimulationContext {
     frequency: f32,
 }
 
+pub enum SnapshotType {
+    None,
+    State,
+    Energy,
+}
+
 impl Simulation {
     pub fn new(device: &Device, config: &Config) -> Result<Self> {
         let map = config
@@ -105,6 +115,11 @@ impl Simulation {
                 )
             })
             .transpose()?;
+
+        let script = config
+            .script
+            .as_ref()
+            .map(|x| Scripting::from_file(config.base_path().join(x)));
 
         let mut raw_shader = Cow::Borrowed(include_str!("shaders/shader.wgsl"));
         if let Some(ref shader) = config.shader {
@@ -171,7 +186,7 @@ impl Simulation {
         });
 
         let mut flags = SimulationFlags::BILINIER_SAMPLING;
-        if config.reflective_boundary {
+        if config.parameters.reflective_boundary {
             flags |= SimulationFlags::REFLECTIVE_BOUNDARY;
         }
 
@@ -184,18 +199,21 @@ impl Simulation {
             average_energy_buffer,
             staging_buffer,
             audio,
+            script,
+
+            queue_snapshot: SnapshotType::None,
 
             ticks_per_dispatch: 1,
             tick: 0,
             running: false,
             flags,
 
-            dt: config.dt,
-            dx: config.dx,
+            dt: config.parameters.dt,
+            dx: config.parameters.dx,
 
-            v: config.v,
-            amplitude: config.amplitude,
-            frequency: config.frequency,
+            v: config.parameters.v,
+            amplitude: config.oscillator.amplitude,
+            frequency: config.oscillator.frequency,
             gain: 1.0,
             energy_gain: 1.0,
         })
@@ -283,6 +301,22 @@ impl Simulation {
             }
 
             self.tick += 1;
+
+            if let Some(script) = &mut self.script {
+                let response = script.post_tick(self.tick, self.running);
+                self.running = response.running;
+
+                if response.reset {
+                    self.reset_states(&gc.queue);
+                    self.reset_average_energy(&gc.queue);
+                }
+
+                self.queue_snapshot = response
+                    .snapshot_state
+                    .then_some(SnapshotType::Energy)
+                    .or(response.snapshot_energy.then_some(SnapshotType::Energy))
+                    .unwrap_or(SnapshotType::None);
+            }
         }
     }
 
@@ -355,5 +389,27 @@ impl SimulationContext {
         let mut buffer = encase::UniformBuffer::new(Vec::new());
         buffer.write(self).unwrap();
         buffer.into_inner()
+    }
+}
+
+impl SnapshotType {
+    pub fn name(&self) -> &'static str {
+        match self {
+            SnapshotType::None => "none",
+            SnapshotType::State => "state",
+            SnapshotType::Energy => "energy",
+        }
+    }
+
+    pub fn stage<'a>(
+        &self,
+        simulation: &'a Simulation,
+        encoder: &mut CommandEncoder,
+    ) -> Option<&'a Buffer> {
+        Some(match self {
+            SnapshotType::State => simulation.stage_state(encoder),
+            SnapshotType::Energy => simulation.stage_energy(encoder),
+            SnapshotType::None => return None,
+        })
     }
 }

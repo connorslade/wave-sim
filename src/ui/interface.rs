@@ -3,11 +3,10 @@ use std::time::Instant;
 use bitflags::Flags;
 use egui::{emath::Numeric, Color32, Context, RichText, Slider, Ui, Window};
 use nalgebra::Vector2;
-use wgpu::{Buffer, CommandEncoder};
 
 use crate::{
     renderer::Renderer,
-    simulation::{Simulation, SimulationFlags},
+    simulation::{Simulation, SimulationFlags, SnapshotType},
     FpsTracker, GraphicsContext,
 };
 
@@ -15,14 +14,7 @@ use super::sci_dragger::SciDragValue;
 
 pub struct Gui {
     pub queue_screenshot: bool,
-    pub queue_snapshot: SnapshotType,
     pub show_about: bool,
-}
-
-pub enum SnapshotType {
-    None,
-    State,
-    Energy,
 }
 
 const COURANT_TIP: &str =
@@ -122,7 +114,7 @@ impl Gui {
                     sci_dragger(ui, "dt (s)", &mut simulation.dt);
                     sci_dragger(ui, "Wave Speed (m/s)", &mut simulation.v);
 
-                    let c = 0.002 * simulation.dt * simulation.v / simulation.dx;
+                    let c = simulation.dt * simulation.v / simulation.dx;
                     ui.horizontal(|ui| {
                         ui.label(format!("Courant: {c:.2}"));
                         if c > 0.7 {
@@ -171,9 +163,9 @@ impl Gui {
                         .clicked()
                     {
                         if shift {
-                            self.queue_snapshot = SnapshotType::State;
+                            simulation.queue_snapshot = SnapshotType::State;
                         } else if ctrl {
-                            self.queue_snapshot = SnapshotType::Energy;
+                            simulation.queue_snapshot = SnapshotType::Energy;
                         } else {
                             self.queue_screenshot = true;
                         }
@@ -210,26 +202,4 @@ fn bit_checkbox<Value: Flags + Copy>(ui: &mut Ui, label: &str, value: &mut Value
     let mut bool_value = value.contains(flag);
     ui.checkbox(&mut bool_value, label);
     value.set(flag, bool_value);
-}
-
-impl SnapshotType {
-    pub fn name(&self) -> &'static str {
-        match self {
-            SnapshotType::None => "none",
-            SnapshotType::State => "state",
-            SnapshotType::Energy => "energy",
-        }
-    }
-
-    pub fn stage<'a>(
-        &self,
-        simulation: &'a Simulation,
-        encoder: &mut CommandEncoder,
-    ) -> Option<&'a Buffer> {
-        Some(match self {
-            SnapshotType::State => simulation.stage_state(encoder),
-            SnapshotType::Energy => simulation.stage_energy(encoder),
-            SnapshotType::None => return None,
-        })
-    }
 }
