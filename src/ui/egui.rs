@@ -4,7 +4,7 @@ use egui_winit::State;
 use wgpu::{CommandEncoder, Device, RenderPassDescriptor, TextureView};
 use winit::event::WindowEvent;
 
-use crate::{GraphicsContext, TEXTURE_FORMAT};
+use crate::{app::TEXTURE_FORMAT, GraphicsContext};
 
 pub struct Egui {
     state: State,

@@ -32,7 +32,7 @@ impl Scripting {
         engine
             .register_type::<Context>()
             .register_get("tick", Context::get_tick)
-            .register_get_set("running", Context::get_running, Context::set_running)
+            .register_fn("pause", Context::pause)
             .register_fn("reset", Context::reset)
             .register_fn("snapshot_state", Context::snapshot_state)
             .register_fn("snapshot_energy", Context::snapshot_energy);
@@ -75,12 +75,8 @@ impl Context {
         self.tick
     }
 
-    fn get_running(&mut self) -> bool {
-        self.running
-    }
-
-    fn set_running(&mut self, running: bool) {
-        self.running = running;
+    fn pause(&mut self) {
+        self.running = false;
     }
 
     fn reset(&mut self) {

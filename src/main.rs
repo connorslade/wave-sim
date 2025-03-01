@@ -1,81 +1,40 @@
-use std::{fs, mem, sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use app::{App, GraphicsContext};
 use image::ImageFormat;
-use ui::{egui::Egui, interface::Gui};
-use wgpu::{
-    CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance,
-    Limits, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
-    TextureFormat, TextureUsages, TextureViewDescriptor,
-};
+use ui::egui::Egui;
+use wgpu::{Instance, RequestAdapterOptions};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
-    window::{Icon, Window, WindowBuilder},
+    window::{Icon, WindowBuilder},
 };
 
+mod app;
 mod config;
 mod misc;
 mod renderer;
 mod scripting;
 mod simulation;
 mod ui;
-use misc::{
-    util::{download_buffer, save_dated_file},
-    RingBuffer,
-};
 use renderer::Renderer;
-use simulation::{Simulation, SimulationFlags, SnapshotType};
+use simulation::{Simulation, SimulationFlags};
 
 const ICON: &[u8] = include_bytes!("assets/icon.png");
-const TEXTURE_FORMAT: TextureFormat = TextureFormat::Bgra8Unorm;
-
-struct App<'a> {
-    graphics: GraphicsContext<'a>,
-    simulation: Simulation,
-    renderer: Renderer,
-
-    egui: Egui,
-    gui: Gui,
-
-    fps: FpsTracker,
-}
-
-struct GraphicsContext<'a> {
-    window: Arc<Window>,
-    surface: Surface<'a>,
-    device: Device,
-    queue: Queue,
-}
-
-struct FpsTracker {
-    fps_history: RingBuffer<f64, 256>,
-    last_frame: Instant,
-}
 
 #[pollster::main]
 async fn main() -> Result<()> {
     let args = config::parse()?;
 
     let instance = Instance::default();
-
     let adapter = instance
         .request_adapter(&RequestAdapterOptions::default())
         .await
         .context("No adapter found")?;
-
-    let (device, queue) = adapter
-        .request_device(
-            &DeviceDescriptor {
-                label: None,
-                required_features: Features::empty(),
-                required_limits: Limits::default(),
-            },
-            None,
-        )
-        .await?;
+    let (device, queue) = adapter.request_device(&Default::default(), None).await?;
 
     let simulation = Simulation::new(&device, &args)?;
     let renderer = Renderer::new(&device, args.size);
@@ -95,25 +54,16 @@ async fn main() -> Result<()> {
 
     let surface = instance.create_surface(window.clone()).unwrap();
 
-    let egui = Egui::new(&device, &window);
-
     let mut app = App {
         simulation,
         renderer,
-        egui,
+        egui: Egui::new(&device, &window),
+        gui: Default::default(),
         graphics: GraphicsContext {
             window,
             surface,
             device,
             queue,
-        },
-        gui: Gui {
-            queue_screenshot: false,
-            show_about: false,
-        },
-        fps: FpsTracker {
-            fps_history: RingBuffer::new(),
-            last_frame: Instant::now(),
         },
     };
 
@@ -157,79 +107,4 @@ async fn main() -> Result<()> {
     })?;
 
     Ok(())
-}
-
-impl App<'_> {
-    fn render(&mut self) {
-        let gc = &self.graphics;
-        let mut encoder = gc
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor { label: None });
-
-        self.simulation
-            .update(gc, &mut encoder, gc.window.inner_size());
-
-        let output = gc.surface.get_current_texture().unwrap();
-        let view = output
-            .texture
-            .create_view(&TextureViewDescriptor::default());
-
-        self.renderer.render(self, &mut encoder, &view);
-        self.egui.render(gc, &mut encoder, &view, |ctx| {
-            self.gui.ui(
-                ctx,
-                gc,
-                &mut self.simulation,
-                &mut self.renderer,
-                &mut self.fps,
-            );
-        });
-
-        let snapshot = self
-            .simulation
-            .queue_snapshot
-            .stage(&self.simulation, &mut encoder);
-
-        gc.queue.submit([encoder.finish()]);
-
-        output.present();
-        gc.window.request_redraw();
-
-        if mem::take(&mut self.gui.queue_screenshot) {
-            if let Err(e) = self.renderer.screenshot(self) {
-                eprintln!("Failed to take screenshot: {:?}", e);
-            }
-        }
-
-        if let Some(snapshot) = snapshot {
-            let mut data = Vec::with_capacity(8 + snapshot.size() as usize);
-            let size = self.simulation.get_size();
-            data.extend_from_slice(&size.x.to_le_bytes());
-            data.extend_from_slice(&size.y.to_le_bytes());
-            data.extend_from_slice(&download_buffer(snapshot, gc));
-
-            let path =
-                save_dated_file("states", self.simulation.queue_snapshot.name(), "bin").unwrap();
-            fs::write(path, data).unwrap();
-
-            self.simulation.queue_snapshot = SnapshotType::None;
-        }
-    }
-
-    fn configure_surface(&mut self) {
-        let size = self.graphics.window.inner_size();
-        self.graphics.surface.configure(
-            &self.graphics.device,
-            &SurfaceConfiguration {
-                usage: TextureUsages::RENDER_ATTACHMENT,
-                format: TEXTURE_FORMAT,
-                width: size.width,
-                height: size.height,
-                present_mode: PresentMode::AutoVsync,
-                desired_maximum_frame_latency: 2,
-                alpha_mode: CompositeAlphaMode::Opaque,
-                view_formats: vec![],
-            },
-        );
-    }
 }

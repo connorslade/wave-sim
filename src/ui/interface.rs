@@ -5,9 +5,10 @@ use egui::{emath::Numeric, Color32, Context, RichText, Slider, Ui, Window};
 use nalgebra::Vector2;
 
 use crate::{
+    misc::RingBuffer,
     renderer::Renderer,
     simulation::{Simulation, SimulationFlags, SnapshotType},
-    FpsTracker, GraphicsContext,
+    GraphicsContext,
 };
 
 use super::sci_dragger::SciDragValue;
@@ -15,6 +16,12 @@ use super::sci_dragger::SciDragValue;
 pub struct Gui {
     pub queue_screenshot: bool,
     pub show_about: bool,
+    fps: FpsTracker,
+}
+
+struct FpsTracker {
+    fps_history: RingBuffer<f64, 256>,
+    last_frame: Instant,
 }
 
 const COURANT_TIP: &str =
@@ -28,11 +35,10 @@ impl Gui {
         gc: &GraphicsContext,
         simulation: &mut Simulation,
         render: &mut Renderer,
-        fps: &mut FpsTracker,
     ) {
         let now = Instant::now();
-        let frame_time = now - fps.last_frame;
-        fps.last_frame = now;
+        let frame_time = now - self.fps.last_frame;
+        self.fps.last_frame = now;
 
         let dragging_viewport = ctx.dragged_id().is_none() && !ctx.is_pointer_over_area();
         let scale_factor = gc.window.scale_factor() as f32;
@@ -56,8 +62,8 @@ impl Gui {
             .show(ctx, |ui| {
                 let size = simulation.get_size();
                 let current_fps = frame_time.as_secs_f64().recip();
-                fps.fps_history.push(current_fps);
-                let avg_fps = fps.fps_history.avg();
+                self.fps.fps_history.push(current_fps);
+                let avg_fps = self.fps.fps_history.avg();
 
                 let (shift, ctrl) = ui.input(|i| (i.modifiers.shift, i.modifiers.ctrl));
 
@@ -202,4 +208,17 @@ fn bit_checkbox<Value: Flags + Copy>(ui: &mut Ui, label: &str, value: &mut Value
     let mut bool_value = value.contains(flag);
     ui.checkbox(&mut bool_value, label);
     value.set(flag, bool_value);
+}
+
+impl Default for Gui {
+    fn default() -> Self {
+        Self {
+            queue_screenshot: false,
+            show_about: false,
+            fps: FpsTracker {
+                fps_history: RingBuffer::new(),
+                last_frame: Instant::now(),
+            },
+        }
+    }
 }

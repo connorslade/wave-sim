@@ -15,7 +15,7 @@ use wgpu::{
     TextureViewDescriptor, VertexState, COPY_BYTES_PER_ROW_ALIGNMENT,
 };
 
-use crate::{misc::util, App, TEXTURE_FORMAT};
+use crate::{app::TEXTURE_FORMAT, misc::util, App};
 
 pub struct Renderer {
     render_pipeline: RenderPipeline,
